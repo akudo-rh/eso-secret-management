@@ -33,7 +33,7 @@
 
 IAM の Role 作成が許可されない場合 (組織ポリシー/SCP/権限境界) は、**代替として管理者に以下を作成してもらう**:
 - Role (名前例: `rosa-eso-demo`)
-  - 信頼ポリシー: ROSA の OIDC Provider を Principal とし、`<OIDC ホストパス>:sub` = `system:serviceaccount:eso-test:eso-aws-sa`、`<OIDC ホストパス>:aud` = `sts.amazonaws.com` の条件付き `sts:AssumeRoleWithWebIdentity`
+  - 信頼ポリシー: ROSA の OIDC Provider を Principal とし、`<OIDC_HOST_PATH>:sub` = `system:serviceaccount:<TARGET_NAMESPACE>:<SERVICE_ACCOUNT>` (検証では `eso-test` / `eso-aws-sa`)、`<OIDC_HOST_PATH>:aud` = `sts.amazonaws.com` の条件付き `sts:AssumeRoleWithWebIdentity`
   - 権限: 検証用シークレット 1 件への `secretsmanager:GetSecretValue` / `DescribeSecret`
   - (テンプレート: [yaml/aws-iam/](../yaml/aws-iam/))
 - 検証用シークレット `rosa-demo/password` (値: `P@ssw0rd-from-aws` 検証用ダミー値)

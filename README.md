@@ -337,7 +337,7 @@ Allow <誰が> to <何をする> <何に> in compartment <どこで> where <条�
 
 | 対象 | ポリシー |
 |---|---|
-| ESO (アプリ A の ServiceAccount) | `Allow any-user to read secret-bundles in compartment prod:app-a where all { request.principal.type = 'identityfederateddomainapp', request.principal.name = 'system:serviceaccount:app-a:eso-app-a', request.principal.ext_iss = '<本番クラスタの発行者>' }` |
+| ESO (アプリ A の ServiceAccount) | `Allow any-user to read secret-bundles in compartment prod:app-a where all { request.principal.type = 'identityfederateddomainapp', request.principal.name = 'system:serviceaccount:app-a:eso-app-a', request.principal.ext_iss = '<本番クラスタの発行者>' }` と、同じ条件で `read vaults in compartment prod` (ESO が SecretStore の接続確認で Vault の情報を読むため) |
 | プラットフォームチーム | `Allow group platform-admins to manage vaults / keys / secret-family in compartment prod` (3 行) |
 | アプリ A の担当者 (6.3 の将来案) | `Allow group app-a-secret-admins to manage secret-family in compartment prod:app-a` と、暗号化キーの `use` 権限 |
 

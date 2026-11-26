@@ -1,5 +1,5 @@
-# oc apply -f yaml/common/namespaces.yaml
+# oc apply -f yaml/common/namespaces.yaml (<TARGET_NAMESPACE> を置き換えてから適用)
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: eso-test
+  name: <TARGET_NAMESPACE>
