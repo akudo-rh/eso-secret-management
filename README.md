@@ -50,6 +50,8 @@ flowchart LR
 | ① 標準 Secret (手動作成) | `oc create secret` で直接登録。簡単だが保管と更新は人手。**base64でエンコードされているだけ（非暗号化）**。 | クラスタ内 |
 | ② **External Secrets Operator (ESO)** | 外部の保管庫の値を、Operator が定期的に Kubernetes の Secret へ同期する | **外部の保管庫** |
 
+![標準 Secret と ESO の比較: 標準 Secret はクラスタ内で手作業管理し base64 エンコードのみ。ESO は外部の保管庫を値の正として自動で同期する](docs/images/secret-management-methods.svg)
+
 
 ## 3. ESO の仕組み
 
