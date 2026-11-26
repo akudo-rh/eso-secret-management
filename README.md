@@ -52,25 +52,12 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  subgraph M1["① 標準 Secret (手動・個別管理)"]
-    direction TB
-    U1["担当者"] -- "手動作成・更新" --> S1["K8s Secret"]
-    G1["Git (平文は置けない)"] -. "管理対象外" .- S1
-    S1 --> A1["アプリ"]
+  subgraph M1["① 標準 Secret"]
+    P1["担当者"] -- "oc create secret" --> S1["Secret"]
   end
-
-  subgraph M2["② ESO (GitOps + 外部保管庫)"]
-    direction TB
-    G2["Git (参照定義のみ)"] -- "宣言的に適用" --> ES2["ExternalSecret"]
-    V2["外部の保管庫<br/>(値の正・一元管理)"] -- "自動同期" --> S2["K8s Secret"]
-    ES2 -. "定義" .-> S2
-    S2 --> A2["アプリ"]
+  subgraph M3["② ESO"]
+    V3["外部の保管庫"] -- "定期的に同期" --> S3["Secret"]
   end
-
-  classDef pf fill:#dbeafe,stroke:#1d4ed8,color:#0f172a
-  classDef app fill:#dcfce7,stroke:#15803d,color:#0f172a
-  class V2,S2 pf
-  class G2,ES2,A2 app
 ```
 
 ## 3. ESO の仕組み
