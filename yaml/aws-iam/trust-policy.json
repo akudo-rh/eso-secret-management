@@ -1,0 +1,18 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::<アカウントID>:oidc-provider/<OIDC ホストパス>"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "<OIDC ホストパス>:sub": "system:serviceaccount:<Namespace 名>:<ServiceAccount 名>",
+          "<OIDC ホストパス>:aud": "sts.amazonaws.com"
+        }
+      }
+    }
+  ]
+}

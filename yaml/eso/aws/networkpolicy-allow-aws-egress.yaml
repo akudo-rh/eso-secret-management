@@ -1,0 +1,24 @@
+# ESO Operator (Red Hat) は external-secrets namespace に deny-all + API/DNS のみ許可の
+# NetworkPolicy (eso-sys-*) を作る。そのままでは AWS (STS / Secrets Manager) に出られない。
+# eso-sys-* は Operator 管理のため編集せず、別名のポリシーで HTTPS egress を許可する。
+# 適用: oc apply -f yaml/eso/aws/networkpolicy-allow-aws-egress.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-aws-egress-for-main-controller   # eso-sys- 接頭辞は使わない
+  namespace: external-secrets
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: external-secrets   # メインコントローラーのみ
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
+      # 検証用に宛先は限定しない。AWS の IP は可変のため NetworkPolicy では FQDN 指定ができない。
+      # 本番では VPC エンドポイント経由にして宛先を絞る、または EgressFirewall(dnsName) 等を検討。
+      to:
+        - ipBlock:
+            cidr: 0.0.0.0/0

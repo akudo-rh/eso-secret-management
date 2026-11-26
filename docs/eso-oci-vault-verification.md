@@ -51,7 +51,7 @@ Kubernetes Secret: demo-secret (key: password)
 
 ### サポート上の注意
 
-README にもあるとおり、**ESO / SSCSI ともに OCI Vault は Red Hat のサポート対象外**で、動作確認対象ではない。本検証は技術的な実現可否の確認であり、本番利用の可否はサポート範囲を別途確認すること。
+提案資料 (README) の留意点にもあるとおり、**ESO における OCI Vault は Red Hat のサポート対象外**で、動作確認対象ではない。本検証は技術的な実現可否の確認であり、本番利用の可否はサポート範囲を別途確認すること。
 
 ## 2. 事前準備と制約
 
@@ -64,6 +64,50 @@ README にもあるとおり、**ESO / SSCSI ともに OCI Vault は Red Hat の
 - `externalsecrets.operator.openshift.io` に cert-manager 設定を後から追加した場合、`external-secrets-cert-controller` の Deployment を手動で削除する (ESO が degraded になるのを防ぐため)。
 - `BitwardenSecretManagerProvider` を有効にできるのは x86_64 / arm64 のクラスタのみ。
 - **cert-manager Operator は ESO より先にインストールしておく。** 後から入れた場合は `external-secrets-operator` の Pod を手動で再起動する。
+
+### 2.1 クライアント端末のツール
+| ツール | 用途 | 確認 |
+|---|---|---|
+| `oc` (クラスタの OCP バージョンに合わせる) | クラスタ操作 | `oc version --client` |
+| `oci` CLI (任意) | シークレットの作成・更新 (OCI コンソール / Cloud Shell でも代替可) | `oci --version` |
+
+### 2.2 必要な情報と確認方法
+以降の手順で使う値を、先にすべて確認して手元に控える。以降の `<...>` はここで確認した値に置き換える。
+OCI コンソールは、画面右上のプロファイル (人型アイコン) から「テナンシ」「ユーザー設定」を開ける。
+
+| 情報 | 使う場所 | 確認方法 |
+|---|---|---|
+| `<API URL>` (OpenShift) | `oc login` | OpenShift Web コンソール右上のユーザー名 →「Copy login command」で表示される `--server=` の値 |
+| `<リージョン>` (例: `ap-tokyo-1`) | SecretStore の `region` | OCI コンソール右上のリージョン表示 |
+| `<テナンシー OCID>` | SecretStore の `auth.tenancy` | OCI コンソール → プロファイル →「テナンシ: ○○」→ 詳細の OCID の「コピー」 |
+| `<ユーザー OCID>` | SecretStore の `auth.user` | OCI コンソール → プロファイル →「ユーザー設定」→ OCID の「コピー」 |
+| `<フィンガープリント>` | 認証情報 Secret (`oci-credentials`) | 「ユーザー設定」→「API キー」→ 登録済みキーの一覧の「フィンガープリント」(API キー追加時の構成ファイルのプレビューにも表示される) |
+| 秘密鍵 (PEM ファイル) | 認証情報 Secret (`oci-credentials`) | API キー追加時にダウンロードしたファイル。**再取得はできない**ので、無ければ API キーを作り直す |
+| `<Vault OCID>` | SecretStore の `vault` | OCI コンソール → アイデンティティとセキュリティ → ボールト → 対象 Vault の詳細の OCID の「コピー」 |
+| `<コンパートメント OCID>` | シークレット作成 (§4.2) | OCI コンソール → アイデンティティとセキュリティ → コンパートメント → 対象の詳細の OCID |
+| `<マスター暗号化キー OCID>` | シークレット作成 (§4.2) | 対象 Vault の詳細 →「マスター暗号化キー」タブ → キーの OCID |
+| `<シークレット名>` (本書は `eso-demo-password`) | ExternalSecret の `remoteRef.key` | 自分で決める。作成後は Vault の「シークレット」タブ / `oci vault secret list --compartment-id <コンパートメント OCID>` |
+| `<シークレット OCID>` | 値の更新 (§4.6) | Vault の「シークレット」タブから対象を開き、詳細の OCID / 上記 `oci vault secret list` の `id` |
+
+### 2.3 クラスタへのログイン
+```bash
+oc login --token=<トークン> --server=<API URL>     # Web コンソールの「Copy login command」の内容
+oc whoami
+oc auth can-i '*' '*' --all-namespaces            # yes なら Operator 導入可
+```
+
+### 2.4 クラスタからの外部通信
+Pod から OCI の API に出られること。
+```bash
+oc run curl -n default --image=registry.access.redhat.com/ubi9/ubi-minimal --restart=Never --command -- sleep 300
+oc wait -n default --for=condition=Ready pod/curl --timeout=120s
+oc exec -n default curl -- curl -sS -o /dev/null -w '%{http_code}\n' --max-time 10 https://vaults.<リージョン>.oci.oraclecloud.com
+oc exec -n default curl -- curl -sS -o /dev/null -w '%{http_code}\n' --max-time 10 https://secretsmgmt.<リージョン>.oci.oraclecloud.com
+oc exec -n default curl -- curl -sS -o /dev/null -w '%{http_code}\n' --max-time 10 https://auth.<リージョン>.oraclecloud.com
+oc delete pod curl -n default
+```
+HTTP コードが返れば (401 / 403 / 404 でも) 到達 OK。タイムアウトは egress 制限。ホスト名はサービス・リージョンにより異なるため、ESO のログ (`oc logs -n external-secrets deploy/external-secrets`) の接続先で最終確認する。
+※ ここで到達できても、ESO の Pod からは到達できない場合がある (ROSA + AWS では実際に発生。[eso-rosa-verification.md](eso-rosa-verification.md) §4.4.1)。ESO の Pod だけタイムアウトする場合は、`external-secrets` Namespace の NetworkPolicy (`oc get networkpolicy -n external-secrets`) を確認する。
 
 ## 3. 導入手順と結果
 
@@ -121,14 +165,14 @@ Dev Spaces に `oci` CLI が無かったため、Cloud Shell で作成した (�
 
 ```bash
 oci vault secret create-base64 \
-  --compartment-id <compartment_ocid> \
-  --vault-id <vault_ocid> \
-  --key-id <master_key_ocid> \
+  --compartment-id <コンパートメント OCID> \
+  --vault-id <Vault OCID> \
+  --key-id <マスター暗号化キー OCID> \
   --secret-name eso-demo-password \
   --secret-content-content "$(echo -n 'P@ssw0rd-from-oci' | base64)"
 ```
 
-`oci vault secret list --compartment-id <compartment_ocid>` で、`eso-demo-password` が `ACTIVE` であることを確認した (作成直後は `CREATING`)。
+`oci vault secret list --compartment-id <コンパートメント OCID>` で、`eso-demo-password` が `ACTIVE` であることを確認した (作成直後は `CREATING`)。
 
 ### 4.3 API キーの登録と認証情報 Secret の作成
 
@@ -142,7 +186,7 @@ oc new-project eso-test
 
 oc create secret generic oci-credentials -n eso-test \
   --from-file=privateKey=/home/user/oci_api_key.pem \
-  --from-literal=fingerprint='<fingerprint>'
+  --from-literal=fingerprint='<フィンガープリント>'
 ```
 ```
 secret/oci-credentials created
@@ -237,7 +281,7 @@ P@ssw0rd-from-oci
 OCI 側でシークレットの新バージョンを作成し、`refreshInterval` (1m) 後に K8s Secret が更新されることを確認する。
 
 ```bash
-oci vault secret update-base64 --secret-id <secret_ocid> \
+oci vault secret update-base64 --secret-id <シークレット OCID> \
   --secret-content-content "$(echo -n 'changed-value' | base64)"
 ```
 
