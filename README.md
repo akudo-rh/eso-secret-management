@@ -52,12 +52,25 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  subgraph M1["① 標準 Secret"]
-    P1["担当者"] -- "oc create secret" --> S1["Secret"]
+  subgraph M1["① 標準 Secret (手動・個別管理)"]
+    direction TB
+    U1["担当者"] -- "手動作成・更新" --> S1["K8s Secret"]
+    G1["Git (平文は置けない)"] -. "管理対象外" .- S1
+    S1 --> A1["アプリ"]
   end
-  subgraph M3["② ESO"]
-    V3["外部の保管庫"] -- "定期的に同期" --> S3["Secret"]
+
+  subgraph M2["② ESO (GitOps + 外部保管庫)"]
+    direction TB
+    G2["Git (参照定義のみ)"] -- "宣言的に適用" --> ES2["ExternalSecret"]
+    V2["外部の保管庫<br/>(値の正・一元管理)"] -- "自動同期" --> S2["K8s Secret"]
+    ES2 -. "定義" .-> S2
+    S2 --> A2["アプリ"]
   end
+
+  classDef pf fill:#dbeafe,stroke:#1d4ed8,color:#0f172a
+  classDef app fill:#dcfce7,stroke:#15803d,color:#0f172a
+  class V2,S2 pf
+  class G2,ES2,A2 app
 ```
 
 ## 3. ESO の仕組み
@@ -102,6 +115,29 @@ flowchart TB
 | `0` を指定した場合 | 最初の 1 回だけ取得し、以降は更新しない |
 | 既定値 | CRD の既定は `1h`。Red Hat ドキュメントの例も `1h` |
 | 目安 | 既定の `1h` を基本とし、ローテーションの反映を急ぐ Secret だけ短くする |
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant PF as プラットフォーム担当
+  participant Vault as 外部の保管庫
+  participant ESO as ESO (Operator)
+  participant Sec as K8s Secret
+  participant App as アプリ (Pod)
+
+  PF->>Vault: 新しい Secret 値を登録
+  Note over ESO,Vault: refreshInterval ごとに定期確認 (既定: 1h)
+  ESO->>Vault: 最新の値を取得
+  Vault-->>ESO: 新しい値を返却
+  ESO->>Sec: Secret を自動更新
+  alt ボリュームマウントで参照
+    Sec-->>App: 数十秒〜1分程度で自動反映 (再起動不要)
+  else 環境変数で参照
+    Note over App: 起動時の値のまま維持される
+    PF->>App: Pod を再起動 (Rollout Restart)
+    Sec-->>App: 新しい環境変数を読み込み
+  end
+```
 
 ## 4. 方式の比較 (メリット・デメリット)
 
@@ -282,6 +318,35 @@ flowchart TB
 
 ### 6.1 作業ごとの担当
 
+```mermaid
+flowchart LR
+  subgraph PF_AREA["プラットフォームチーム担当 (基盤・権限・保管庫)"]
+    direction TB
+    R4["R4. ESO 導入・監視"]
+    R2["R2. 保管庫・IAM 権限設定"]
+    R3["R3. Secret 値の登録・更新"]
+    R5["R5. ServiceAccount /<br/>SecretStore 作成"]
+  end
+
+  subgraph APP_AREA["アプリチーム担当 (Git・アプリ定義)"]
+    direction TB
+    R1["R1. 必要な Secret の洗い出し"]
+    R6["R6. ExternalSecret 作成<br/>(Git 管理)"]
+    R8["R8. アプリで Secret 利用"]
+  end
+
+  R1 -- "申請" --> R2
+  R2 --> R3
+  R2 --> R5
+  R5 -. "利用許可された<br/>接続先を参照" .-> R6
+  R6 -- "CI/CD 自動適用 (R7)" --> R8
+
+  classDef pf fill:#dbeafe,stroke:#1d4ed8,color:#0f172a
+  classDef app fill:#dcfce7,stroke:#15803d,color:#0f172a
+  class R2,R3,R4,R5 pf
+  class R1,R6,R8 app
+```
+
 | 項番 | 作業 | プラットフォーム | アプリ |
 |---|---|---|---|
 | R1 | 必要な Secret の洗い出し (名前・用途・更新頻度) | 確認 | **実施** |
@@ -412,6 +477,21 @@ flowchart LR
 | 1 | 保管庫に新しいバージョンを登録 | プラットフォーム |
 | 2 | `refreshInterval` 後に Secret へ自動反映 (3.1) | (自動) |
 | 3 | アプリへの反映: 環境変数で参照している場合は Pod の再起動が必要。ボリュームで参照している場合は自動で反映される | アプリ |
+
+```mermaid
+flowchart LR
+  S1["1. Secret 申請<br/>(アプリ)"] --> S2["2. 基盤・IAM 準備<br/>(プラットフォーム)<br/>※初回のみ"]
+  S2 --> S3["3. 保管庫へ値登録<br/>(プラットフォーム)<br/>開発→テスト→本番"]
+  S3 --> S4["4. ExternalSecret 定義<br/>(アプリ / Git登録)"]
+  S4 --> S5["5. デプロイ・自動同期<br/>(CI/CD → ESO)"]
+
+  classDef pf fill:#dbeafe,stroke:#1d4ed8,color:#0f172a
+  classDef app fill:#dcfce7,stroke:#15803d,color:#0f172a
+  classDef auto fill:#f1f5f9,stroke:#64748b,color:#0f172a
+  class S2,S3 pf
+  class S1,S4 app
+  class S5 auto
+```
 
 ## 7. 今後の検討事項
 本書の内容のうち、今後決定が必要な事項と、確認を進めている事項をまとめる。
