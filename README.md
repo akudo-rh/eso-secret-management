@@ -65,20 +65,35 @@ flowchart LR
 「どこへ・どう接続するか」(SecretStore) と「何を取得するか」(ExternalSecret) を別のリソースに分けて定義する。
 
 ```mermaid
-flowchart TB
-  V["外部の保管庫<br/>(AWS Secrets Manager / OCI Vault など)"]
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'sans-serif', 'lineColor': '#475569'}}}%%
+flowchart LR
+  V[("☁️ 外部の保管庫<br/>AWS Secrets Manager<br/>OCI Vault")]
+
   subgraph OCP["OpenShift クラスタ"]
-    SS["SecretStore<br/>接続先と認証方法"]
-    ES["ExternalSecret<br/>どの値を取得するか"]
-    ESO["ESO (Operator)"]
-    SEC["Kubernetes Secret<br/>(ESO が自動作成・更新)"]
-    APP["アプリ (Pod)<br/>環境変数 / ボリュームで参照"]
-    SS --> ESO
-    ES --> ESO
-    ESO -- "② 同期 (作成・更新)" --> SEC
-    SEC -- "③ 従来どおり参照" --> APP
+    direction TB
+    subgraph PF["🟦 プラットフォーム管理"]
+      SS["SecretStore<br/>(接続先・認証)"]
+      ESO(["⚙️ ESO<br/>(Operator)"])
+    end
+
+    subgraph APP_NS["🟩 アプリ Namespace"]
+      ES["ExternalSecret<br/>(取得定義)"]
+      SEC["🔑 K8s Secret<br/>(自動生成・更新)"]
+      APP(["🚀 アプリ Pod"])
+    end
   end
-  ESO -- "① 認証して取得 (定期的)" --> V
+
+  SS -. "認証設定" .-> ESO
+  ES -. "取得対象" .-> ESO
+  ESO == "① 定期取得 (認証)" ==> V
+  ESO == "② 自動作成・上書き" ==> SEC
+  SEC -- "③ 従来通り参照" --> APP
+
+  style OCP fill:#f8fafc,stroke:#94a3b8,stroke-width:2px
+  style PF fill:#eff6ff,stroke:#93c5fd
+  style APP_NS fill:#f0fdf4,stroke:#86efac
+  style V fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f
+  style SEC fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d
 ```
 
 | リソース | スコープ | 役割 | 作る人 |
