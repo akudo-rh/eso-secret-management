@@ -1,0 +1,327 @@
+# ESO × OCI Vault 検証まとめ (OpenShift on OCI)
+
+OpenShift on OCI 上の検証クラスタに External Secrets Operator (ESO) を導入し、OCI Vault のシークレットを Kubernetes Secret として同期できるかを確認した記録。
+
+- 検証に使った YAML → [yaml/eso/oci/](../yaml/eso/oci/)
+
+## 0. 検証開始前に確定させる項目 (ヒアリング・確認事項)
+
+| 項目 | 確認先 | 影響 |
+|---|---|---|
+| OpenShift クラスタの種別・OCP バージョン | クラスタ管理者 | Operator の導入手順 |
+| `cluster-admin` が使えるか | クラスタ管理者 | Operator 導入に必須 |
+| クラスタから OCI API (`*.oraclecloud.com`) への egress | ネットワーク担当 | 不可の場合は許可依頼 (§5 タイムアウト) |
+| OCI Vault と Master Encryption Key の有無、作成権限 | OCI 管理者 | シークレット作成に必須 (§4.1)。不可なら作成を依頼 |
+| OCI の IAM ポリシー (`read secret-family` 等) | OCI 管理者 | 不足すると 401 / 404 (§5) |
+| API キーの登録可否 (ユーザーあたり 3 つまで) | OCI 管理者 | 認証方式 (§4.3)。不可なら登録許可を依頼 |
+
+## 1. 検証の概要
+
+| 項目 | 内容 |
+|---|---|
+| 目的 | ESO が OCI Vault をバックエンドとして動作するかを実機で確認する |
+| クラスタ | OpenShift on OCI (検証用クラスタ) |
+| ESO | External Secrets Operator for Red Hat OpenShift 1.2.1 (チャネル `stable-v1.2`) |
+| cert-manager | cert-manager Operator for Red Hat OpenShift 1.20.1 (チャネル `stable-v1.20`) |
+| OCI Region | ap-tokyo-1 |
+| 認証方式 | User Principal (API キー) |
+| 作業端末 | クラスタ内の OpenShift Dev Spaces (`oc` は kubeadmin で実行) |
+| 検証用 Namespace | `eso-test` |
+
+### 構成
+
+```
+OCI Vault (secret: eso-demo-password)
+        ↑ API キーで認証して取得
+ESO (SecretStore: oci-vault / ExternalSecret: demo-secret)
+        ↓ 同期
+Kubernetes Secret: demo-secret (key: password)
+```
+
+### 結果サマリ
+
+| 確認項目 | 結果 |
+|---|---|
+| cert-manager Operator / ESO のインストール | 成功 |
+| OCI Vault・Master Encryption Key・シークレットの作成 | 成功 |
+| 認証情報 Secret (`oci-credentials`) の作成 | 成功 |
+| SecretStore が OCI Vault に接続できる | 成功 (`Valid` / `Ready=True` / `ReadWrite`) |
+| ExternalSecret による Secret 同期 | 成功 (`SecretSynced` / `Ready=True`、`P@ssw0rd-from-oci` を取得) |
+| OCI 側の値更新が追従する | 成功 (`refreshInterval=1m` 後に `P@ssw0rd-from-oci-v2` へ更新) |
+
+### サポート上の注意
+
+README にもあるとおり、**ESO / SSCSI ともに OCI Vault は Red Hat のサポート対象外**で、動作確認対象ではない。本検証は技術的な実現可否の確認であり、本番利用の可否はサポート範囲を別途確認すること。
+
+## 2. 事前準備と制約
+
+### 公式ドキュメント
+- [External Secrets Operator for Red Hat OpenShift (OCP 4.22)](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/security_and_compliance/index#external-secrets-operator-for-red-hat-openshift)
+- [Installing (OCP 4.22)](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/security_and_compliance/index#external-secrets-operator-install)
+
+### Limitations (13.3.1 より)
+- Operator をアンインストールしても、external-secrets アプリケーション用に作られたリソースは削除されない。手動で削除する。
+- `externalsecrets.operator.openshift.io` に cert-manager 設定を後から追加した場合、`external-secrets-cert-controller` の Deployment を手動で削除する (ESO が degraded になるのを防ぐため)。
+- `BitwardenSecretManagerProvider` を有効にできるのは x86_64 / arm64 のクラスタのみ。
+- **cert-manager Operator は ESO より先にインストールしておく。** 後から入れた場合は `external-secrets-operator` の Pod を手動で再起動する。
+
+## 3. 導入手順と結果
+
+### 3.1 cert-manager Operator
+
+1. Web コンソールの OperatorHub からインストール
+   - チャネル: `stable-v1.20` / バージョン: 1.20.1 / 更新の承認: 手動 / その他デフォルト
+2. InstallPlan を Web コンソールで承認
+3. 確認
+   ```bash
+   oc get po -n cert-manager-operator
+   ```
+   ```
+   NAME                                                       READY   STATUS    RESTARTS   AGE
+   cert-manager-operator-controller-manager-87646768b-57vxs   1/1     Running   0          79s
+   ```
+
+### 3.2 External Secrets Operator for Red Hat OpenShift
+
+1. Web コンソールの OperatorHub からインストール
+   - チャネル: `stable-v1.2` / バージョン: 1.2.1 / 更新の承認: 手動 / その他デフォルト
+2. InstallPlan を承認
+3. インストール済み Operator で ESO が `Succeeded` になることを確認
+4. 確認
+   ```bash
+   oc get po -n external-secrets-operator
+   ```
+   ```
+   NAME                                                            READY   STATUS    RESTARTS   AGE
+   external-secrets-operator-controller-manager-548ff8d645-96ds4   1/1     Running   0          43m
+   ```
+
+## 4. OCI Vault 連携の検証
+
+### 4.1 OCI Vault と Master Encryption Key の作成 (OCI コンソール)
+
+OCI では**シークレット作成時に Master Encryption Key の指定が必須**。キー作成権限がない場合は、既存キーを使うか管理者に作成を依頼する (`use keys` と `manage secret-family` があればシークレット作成は可能)。
+
+Vault: Identity & Security → Vault で作成 (例: `test-vault`)
+
+OCI Vaultについて [https://docs.oracle.com/en-us/iaas/Content/KeyManagement/Concepts/keyoverview.htm]
+
+Key: 作成した Vault の「マスター暗号化キー」タブで作成
+
+| 項目 | 値 |
+|---|---|
+| 名前 | `eso-test-key` |
+| アルゴリズム | AES |
+| キーの長さ | 256 ビット |
+| 保護モード | ソフトウェア |
+
+### 4.2 シークレットの作成 (OCI Cloud Shell)
+
+Dev Spaces に `oci` CLI が無かったため、Cloud Shell で作成した (コンソールからの作成でも可)。
+
+```bash
+oci vault secret create-base64 \
+  --compartment-id <compartment_ocid> \
+  --vault-id <vault_ocid> \
+  --key-id <master_key_ocid> \
+  --secret-name eso-demo-password \
+  --secret-content-content "$(echo -n 'P@ssw0rd-from-oci' | base64)"
+```
+
+`oci vault secret list --compartment-id <compartment_ocid>` で、`eso-demo-password` が `ACTIVE` であることを確認した (作成直後は `CREATING`)。
+
+### 4.3 API キーの登録と認証情報 Secret の作成
+
+**OCI コンソール:** 対象ユーザーの API keys → Add API key → Generate API key pair → 秘密鍵をダウンロードして Add。表示される構成プレビューから `user`、`fingerprint`、`tenancy`、`region` を控える。
+(API キーは 1 ユーザーあたり 3 つまで)
+
+**Dev Spaces:** ダウンロードした秘密鍵をワークスペースに置き、Secret を作成する。
+
+```bash
+oc new-project eso-test
+
+oc create secret generic oci-credentials -n eso-test \
+  --from-file=privateKey=/home/user/oci_api_key.pem \
+  --from-literal=fingerprint='<fingerprint>'
+```
+```
+secret/oci-credentials created
+```
+
+> 秘密鍵は Git に置かない。検証後はワークスペースの `.pem` を削除し、OCI 側の API キーも不要なら削除する。
+> [yaml/eso/oci/01-oci-credentials_example.yaml](../yaml/eso/oci/01-oci-credentials_example.yaml) は書式の参考用で、実際の値は入れない。
+
+### 4.4 SecretStore の作成と接続確認
+
+[yaml/eso/oci/02-secretstore.yaml](../yaml/eso/oci/02-secretstore.yaml) の `region`、`vault`、`auth.tenancy`、`auth.user` を環境に合わせて設定して適用する。
+
+```bash
+oc apply -f 02-secretstore.yaml
+oc get secretstore -n eso-test
+```
+```
+NAME        AGE   STATUS   CAPABILITIES   READY
+oci-vault   13s   Valid    ReadWrite      True
+```
+
+`status.conditions` に `reason: Valid` / `message: store validated` が出ており、OCI Vault への認証と接続が成功している。
+
+```
+~ $ oc get secretstore oci-vault -n eso-test -oyaml
+apiVersion: external-secrets.io/v1
+kind: SecretStore
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"external-secrets.io/v1","kind":"SecretStore","metadata":{"annotations":{},"name":"oci-vault","namespace":"eso-test"},"spec":{"provider":{"oracle":{"auth":{"secretRef":{"fingerprint":{"key":"fingerprint","name":"oci-credentials"},"privatekey":{"key":"privateKey","name":"oci-credentials"}},"tenancy":"ocid1.tenancy.oc1..<省略>","user":"ocid1.user.oc1..<省略>"},"region":"ap-tokyo-1","vault":"ocid1.vault.oc1..<省略>"}}}}
+  creationTimestamp: "2026-10-21T04:27:16Z"
+  generation: 1
+  name: oci-vault
+  namespace: eso-test
+  resourceVersion: "10094176"
+  uid: 67ca17ee-1d30-464a-b165-5cd2ac7bfbd9
+spec:
+  provider:
+    oracle:
+      auth:
+        secretRef:
+          fingerprint:
+            key: fingerprint
+            name: oci-credentials
+          privatekey:
+            key: privateKey
+            name: oci-credentials
+        tenancy: ocid1.tenancy.oc1..<省略>
+        user: ocid1.user.oc1..<省略>
+      region: ap-tokyo-1
+      vault: ocid1.vault.oc1..<省略>
+status:
+  capabilities: ReadWrite
+  conditions:
+  - lastTransitionTime: "2026-10-21T04:27:16Z"
+    message: store validated
+    reason: Valid
+    status: "True"
+    type: Ready
+~ $ 
+```
+
+> **注意:** SecretStore が存在しない状態で `oc get secretstore oci-vault` を実行すると "not found" になる。`oc apply -f 02-secretstore.yaml` を先に実行する必要がある。
+> また、`oc get secretstore` には `-n eso-test` を付ける (付けないと現在のプロジェクトを参照する)。
+
+### 4.5 ExternalSecret による同期の確認
+
+[yaml/eso/oci/03-externalsecret.yaml](../yaml/eso/oci/03-externalsecret.yaml) を適用して確認する。
+
+```bash
+oc apply -f 03-externalsecret.yaml
+oc get externalsecret demo-secret -n eso-test
+oc get secret demo-secret -n eso-test -o jsonpath='{.data.password}' | base64 -d; echo
+```
+
+期待する結果: ExternalSecret が `SecretSynced` / `Ready=True` になり、`P@ssw0rd-from-oci` が取得できる。
+
+```
+~ $ oc get externalsecret -n eso-test
+NAME          STORETYPE     STORE       REFRESH INTERVAL   STATUS         READY   LAST SYNC
+demo-secret   SecretStore   oci-vault   1m                 SecretSynced   True    55s
+~ $
+
+~ $ oc get secret demo-secret -n eso-test -o jsonpath='{.data.password}' | base64 -d; echo
+P@ssw0rd-from-oci
+~ $ 
+```
+
+### 4.6 更新追従の確認
+
+OCI 側でシークレットの新バージョンを作成し、`refreshInterval` (1m) 後に K8s Secret が更新されることを確認する。
+
+```bash
+oci vault secret update-base64 --secret-id <secret_ocid> \
+  --secret-content-content "$(echo -n 'changed-value' | base64)"
+```
+
+シークレットを更新する ( 'changed-value' を 'P@ssw0rd-from-oci-v2' にした場合）
+```
+<user>@cloudshell:~ (ap-tokyo-1)$ oci vault secret update-base64 --secret-id 'ocid1.vaultsecret.oc1..<省略>' --secret-content-content "$(echo -n 'P@ssw0rd-from-oci-v2' | base64)"
+{
+  "data": {
+    "compartment-id": "ocid1.compartment.oc1..<省略>",
+    "current-version-number": 2,
+    "defined-tags": {
+      "Oracle-Tags": {
+        "CreatedBy": "default/<user>@example.com",
+        "CreatedOn": "2026-10-21T03:53:09.185Z"
+      }
+    },
+    "description": null,
+    "freeform-tags": {},
+    "id": "ocid1.vaultsecret.oc1..<省略>",
+    "is-auto-generation-enabled": false,
+    "is-replica": null,
+    "key-id": "ocid1.key.oc1..<省略>",
+    "last-rotation-time": null,
+    "lifecycle-details": null,
+    "lifecycle-state": "UPDATING",
+    "metadata": null,
+    "next-rotation-time": null,
+    "replication-config": null,
+    "rotation-config": null,
+    "rotation-status": "NOT_ENABLED",
+    "secret-generation-context": null,
+    "secret-name": "eso-demo-password",
+    "secret-rules": null,
+    "source-region-information": null,
+    "time-created": "2026-10-21T03:53:09.105000+00:00",
+    "time-of-current-version-expiry": null,
+    "time-of-deletion": null,
+    "vault-id": "ocid1.vault.oc1..<省略>"
+  },
+  "etag": "bb5bfccd28fcd64a2cc96986aff0a28cb8d408526a55a66ded250eb459e5f23d"
+}
+<user>@cloudshell:~ (ap-tokyo-1)$ 
+```
+
+ocコマンドでsecretの更新を確認する
+```
+~ $ oc get externalsecret -n eso-test
+NAME          STORETYPE     STORE       REFRESH INTERVAL   STATUS         READY   LAST SYNC
+demo-secret   SecretStore   oci-vault   1m                 SecretSynced   True    15s
+~ $ 
+~ $ oc get secret demo-secret -n eso-test -o jsonpath='{.data.password}' | base64 -d; echo
+P@ssw0rd-from-oci-v2
+~ $ 
+```
+
+
+## 5. トラブルシュート
+
+| 症状 | 確認 |
+|---|---|
+| SecretStore が Invalid | `oc describe secretstore oci-vault -n eso-test`。fingerprint・user・tenancy OCID・秘密鍵の組み合わせを確認 |
+| 401 / 404 | IAM ポリシー不足 (最低限 `read secret-family`)、Vault OCID / Region の誤り、シークレット名の誤り |
+| タイムアウト | Dev Spaces やクラスタから OCI API への egress 制限 |
+| ESO のログ | `oc logs -n external-secrets deploy/external-secrets` (名前空間は環境により異なるため `oc get po -A \| grep external-secrets` で確認) |
+| cert-manager 関連で ESO が不調 | 2 章の Limitations を参照。ESO の Operator Pod を再起動する |
+
+## 6. 本番利用に向けた課題
+
+README の環境別比較のとおり、OpenShift on OCI では認証方式が論点になる。
+
+| 方式 | 特徴 | 課題 |
+|---|---|---|
+| User Principal (API キー) ← 今回 | 手軽。検証向き | 秘密鍵の保管とローテーションが必要。鍵が漏れると Vault に直接アクセスされる |
+| Instance Principal | 鍵の管理が不要 | ノード単位の権限になり粒度が粗い (Dynamic Group + Policy で絞る) |
+| Workload Identity | Pod / ServiceAccount 単位で絞れる | OKE 向けが中心。OpenShift on OCI での利用可否は未確認 |
+
+加えて、サポート対象外である点 (1 章) と、キー・IAM の管理者を責任分界で明確にする点も整理が必要。
+
+## 7. 後片付け
+
+```bash
+oc delete project eso-test
+```
+
+- OCI: シークレット (削除予約、最短 1 日)・Key (削除予約、最短 7 日)・不要な API キーを削除する
+- Dev Spaces: ワークスペース上の秘密鍵 (`.pem`) を削除する
+- ESO / cert-manager をアンインストールする場合は、2 章の Limitations のとおり残ったリソースを手動で削除する
