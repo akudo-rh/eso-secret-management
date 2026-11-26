@@ -3,6 +3,25 @@
 > 検証結果は ROSA (AWS Secrets Manager) / OpenShift on OCI (OCI Vault) の実機検証に基づく。
 > 図は Mermaid 形式 (GitHub 上で図として表示される)。
 
+## 目次
+- [1. Secret とは、なぜ管理が必要か](#1-secret-とはなぜ管理が必要か)
+- [2. OpenShift / Kubernetes での Secret 管理の方法](#2-openshift--kubernetes-での-secret-管理の方法)
+- [3. ESO の仕組み](#3-eso-の仕組み)
+  - [3.1 同期間隔 (refreshInterval) の考え方](#31-同期間隔-refreshinterval-の考え方)
+- [4. 方式の比較 (メリット・デメリット)](#4-方式の比較-メリットデメリット)
+- [5. 導入手順 (実機検証済みの流れ)](#5-導入手順-実機検証済みの流れ)
+  - [5.1 ROSA 版 (保管庫: AWS Secrets Manager)](#51-rosa-版-保管庫-aws-secrets-manager)
+  - [5.2 OCI 版 (保管庫: OCI Vault / OpenShift on OCI)](#52-oci-版-保管庫-oci-vault--openshift-on-oci)
+  - [5.3 環境による違い (要点)](#53-環境による違い-要点)
+  - [5.4 OpenShift 上で作成するリソースとスコープ](#54-openshift-上で作成するリソースとスコープ)
+- [6. 役割分担と運用設計 (案)](#6-役割分担と運用設計-案)
+  - [6.1 作業ごとの担当](#61-作業ごとの担当)
+  - [6.2 Secret の値の受け渡し方法](#62-secret-の値の受け渡し方法)
+  - [6.3 権限の設計 (OCI + Workload Identity の案)](#63-権限の設計-oci--workload-identity-の案)
+  - [6.4 運用フロー (案)](#64-運用フロー-案)
+- [7. 今後の検討事項](#7-今後の検討事項)
+- [付録: 参照ドキュメント](#付録-参照ドキュメント)
+
 ## 1. Secret とは、なぜ管理が必要か
 
 **Secret** = パスワード、API キー、証明書、トークンなど、漏えいすると被害が出る値。
@@ -94,23 +113,16 @@ flowchart TB
 | 更新・ローテーション | 手動 | **自動 (定期同期)** |
 | Git に値を置かない | ○ (ただし手作業) | **○** |
 | 権限・監査の一元管理 | × | **○ (保管庫側)** |
-| 保管庫停止時 | 影響なし | 同期済みの Secret で稼働継続 |
+| 保管庫停止時 | 影響なし | 同期済みの Secret で稼働を継続 (停止中は値の更新・新しい Secret の作成が反映されない) |
 | クラスタ (etcd) に値が残る | 残る | 残る |
-| 導入の手間 | 小 | 中 (Operator 導入と保管庫の準備) |
-| 追加の費用 | なし | 保管庫の利用料 (下表) |
+| 導入の手間 | 小 | 中 (Operator の導入と保管庫の準備) |
 | 向く場面 | 小規模・検証 | **標準の選択肢 (本提案)** |
 
-**ESO のデメリット/留意点**
-- クラスタ内 (etcd) に Secret が残る → etcd の暗号化と RBAC で担保する。
-- ESO は強い権限で動くため、SecretStore を作れる人を絞る。
-- 保管庫の準備 (作成・権限設定) が別途必要。利用料は保管庫によって異なる。
-
-**保管庫の利用料 (2026 年 11 月時点。最新は各社の価格表で確認)**
-
-| 保管庫 | 課金の対象 | 備考 |
-|---|---|---|
-| OCI Vault (Secret Management) | **シークレットは無料**。暗号化キーは、ソフトウェア保護キーは無料、HSM 保護キーは 20 キー・バージョンまで無料で以降はキー・バージョン単位の月額 | Private Vault (専有型) を選ぶと Vault 単位の時間課金が加わる。通常の Virtual Vault なら追加費用は小さい |
-| AWS Secrets Manager | シークレット 1 個あたり月額 (0.40 USD) + API 呼び出し 1 万回あたり 0.05 USD | API 料金は呼び出し回数に応じて発生 |
+**ESO の留意点**
+- etcd に値が残る点は、etcd の暗号化と RBAC で担保する。
+- ESO は強い権限で動くため、SecretStore を作れる人を絞る (6 章)。
+- 保管庫の準備 (作成・権限設定) が別途必要 (5 章)。
+- Red Hat の動作確認対象かどうかは保管庫によって異なる (5.3)。
 
 ## 5. 導入手順 (実機検証済みの流れ)
 
@@ -165,10 +177,10 @@ flowchart LR
 | 認証 | User Principal (API キー)。キーを K8s Secret に保管して SecretStore から参照 (検証用) |
 | OCI 側の準備 | Vault と Master Encryption Key、シークレット、ユーザー/グループ/IAM ポリシー |
 | OpenShift 側の準備 | API キーを入れる Secret。ROSA で必要だった外向き通信の NetworkPolicy は、OCI の検証では追加しなくても接続できた (ESO が外に出られない場合は ROSA と同じ対処をする) |
-| 注意点 | API キーの保管とローテーションが必要 (管理方法の案は 5.2.2)。本番では Workload Identity を検討 (5.2.1)。OCI Vault は Red Hat の動作確認対象の一覧には含まれない (本検証で動作は確認済み) |
+| 注意点 | API キーの保管とローテーションが必要 (管理方法の案は 5.2.2)。本番では Workload Identity を検討 (5.2.1) |
 | 検証結果 | 同期 ✔、更新追従 ✔ (`refreshInterval` 1 分後に反映) ([eso-oci-vault-verification.md](docs/eso-oci-vault-verification.md)) |
 
-#### 5.2.1 本番候補: Workload Identity (検証予定)
+#### 5.2.1 本番候補: Workload Identity (確認中)
 OpenShift の ServiceAccount (SA) のトークンを OCI の短期トークンに交換して認証する方式。AWS の STS (ROSA) と同じ考え方で、**SA 単位で権限を分けられる**。2026 年 9 月に OCI が自己管理 Kubernetes 向けの対応を発表した。
 
 ```mermaid
@@ -181,24 +193,11 @@ flowchart LR
   POL["IAM ポリシー<br/>SA 名で読み取りを許可"] -. "許可" .-> VAULT
 ```
 
-| 観点 | AWS の STS (ROSA) | OCI の Workload Identity |
-|---|---|---|
-| クラスタに置く鍵 | なし | OCI の鍵はなし (交換用アプリのクライアントシークレットは必要) |
-| 権限の単位 | Namespace / ServiceAccount | Namespace / ServiceAccount |
-| 信頼の設定先 | IAM の OIDC プロバイダと Role の信頼ポリシー | アイデンティティ・ドメインの信頼設定 (Identity Propagation Trust) |
-
-> ESO の OCI 用の Workload 設定は OKE 向けの仕組みを前提にしているため、OpenShift 上の ESO から利用できるかを確認している (8 章 No. 5)。
-> Instance Principal (ノード自身の ID で認証する方式) は、権限がノード単位になり同じノード上のすべての Pod に及ぶため第一候補にはしないが、代替案として評価する (8 章 No. 9)。
+> ESO の OCI 用の Workload 設定は OKE 向けの仕組みを前提にしているため、OpenShift 上の ESO から利用できるかを確認している (7 章 No. 6)。
+> Instance Principal (ノード自身の ID で認証する方式) は、権限がノード単位になり同じノード上のすべての Pod に及ぶため第一候補にはしないが、代替案として評価する (7 章 No. 10)。
 
 #### 5.2.2 API キー方式で運用する場合の管理 (案)
-Workload Identity の確認結果によっては、当面 API キー方式で運用する可能性がある。その場合の管理方法の案を示す。詳細は 8 章の検討事項として決定する。
-
-**ROSA との違い**
-
-| | ROSA (STS) | OCI (API キー方式) |
-|---|---|---|
-| ESO が使う認証情報 | ServiceAccount のトークン (OpenShift が自動で発行・更新) | OCI ユーザーの API キー (秘密鍵) |
-| クラスタに置くもの | なし (AWS 側がクラスタのトークンを信頼する設定を持つ) | 秘密鍵とフィンガープリントを Secret (`oci-credentials`) として保持 |
+Workload Identity の確認結果によっては、当面 API キー方式で運用する可能性がある。その場合の管理方法の案を示す。
 
 **秘密鍵とフィンガープリントの扱い**
 - 必要なのはクラスタの Secret の中だけ (etcd に保存)。ノードや作業端末にファイルとして置いておく必要はない。
@@ -210,7 +209,7 @@ Workload Identity の確認結果によっては、当面 API キー方式で運
 
 | 観点 | 案 |
 |---|---|
-| API キーの持ち主 | 個人ではなく ESO 専用の OCI ユーザーを作る。コンソールのパスワードは持たせず、`read secret-bundles` だけを許可する。環境 (開発 / テスト / 本番) ごとに分ける |
+| API キーの持ち主 | 個人ではなく ESO 専用の OCI ユーザーを作る。コンソールのパスワードは持たせず、`read secret-bundles` と `read vaults` だけを許可する。環境 (開発 / テスト / 本番) ごとに分ける |
 | 秘密鍵のコピー | Secret 以外には残さない。紛失したら作り直す |
 | ローテーション | OCI のユーザーには API キーを複数登録できる。新しいキーを追加 → Secret を差し替え → 同期を確認 → 古いキーを削除、の順で止めずに入れ替える。周期は社内規程に合わせる |
 | Secret の置き場所 | アプリの Namespace に置くと、その Namespace の管理者が鍵を取り出せる。ClusterSecretStore を使い、鍵はプラットフォームチームだけが参照できる Namespace に置く |
@@ -222,9 +221,9 @@ Workload Identity の確認結果によっては、当面 API キー方式で運
 | クラスタに置く鍵 | なし | あり (秘密鍵) | なし (交換用のクライアントシークレットのみ) |
 | 権限の単位 | Namespace / ServiceAccount | API キーのユーザー | Namespace / ServiceAccount |
 | 追加の準備 (クラウド側) | IAM Role と信頼設定 | ユーザー / グループ / IAM ポリシー、API キー | 信頼設定、交換用アプリ、IAM ポリシー |
-| 追加の準備 (OpenShift 側) | ServiceAccount、外向き通信の NetworkPolicy | API キーの Secret | ServiceAccount (通信の要否は検証で確認) |
-| 検証状況 | 検証済み | 検証済み | 検証予定 |
-| Red Hat の動作確認対象 | 対象 (バージョン別に要確認) | 一覧に含まれない | 一覧に含まれない |
+| 追加の準備 (OpenShift 側) | ServiceAccount、外向き通信の NetworkPolicy | API キーの Secret | ServiceAccount (通信の要否は確認中) |
+| 検証状況 | 検証済み | 検証済み | 確認中 |
+| Red Hat の動作確認対象 | 対象 (バージョン別に確認) | 一覧に含まれない (本検証で動作は確認済み) | 一覧に含まれない |
 
 ### 5.4 OpenShift 上で作成するリソースとスコープ
 
@@ -274,41 +273,16 @@ flowchart TB
 
 `<TARGET_NAMESPACE>` などのプレースホルダは [yaml/README.md](yaml/README.md) を参照。
 
-## 6. 役割分担 (案)
+## 6. 役割分担と運用設計 (案)
 
 次の 2 チームで考える。
 
 - **プラットフォームチーム**: クラスタの運用・CI/CD 基盤・クラウド (AWS / OCI) の管理を担う
 - **アプリチーム**: アプリケーションの開発・運用を担う
 
-**前提:** 現状、AWS Management Console / OCI の Web コンソールを操作する権限を持つのはプラットフォームチームのみ。将来はアプリチームにも一部の操作権限を渡す可能性がある。
+**前提:** 現状、AWS Management Console / OCI の Web コンソールを操作する権限を持つのはプラットフォームチームのみ。
 
-### 6.1 全体像 (現状の案)
-
-```mermaid
-flowchart LR
-  subgraph PF["プラットフォームチーム"]
-    direction TB
-    P1["保管庫の作成<br/>(AWS / OCI コンソール)"]
-    P2["IAM ロール・ポリシーの設定"]
-    P3["Secret の値の登録・更新"]
-    P4["ESO の導入・運用"]
-    P5["SecretStore の作成と<br/>作成権限の制御"]
-    P6["manifest のデプロイ自動化<br/>(CI/CD)"]
-  end
-  subgraph APP["アプリチーム"]
-    direction TB
-    A1["必要な Secret の洗い出し<br/>(名前・用途・更新頻度)"]
-    A2["ExternalSecret の定義<br/>(Git で管理)"]
-    A3["アプリでの Secret の利用"]
-  end
-  A1 -- "依頼" --> P3
-  P5 -- "SecretStore を提供" --> A2
-  A2 -- "Git に push" --> P6
-  P6 -- "デプロイ" --> A3
-```
-
-### 6.2 作業ごとの担当 (現状)
+### 6.1 作業ごとの担当
 
 | 項番 | 作業 | プラットフォーム | アプリ |
 |---|---|---|---|
@@ -321,42 +295,28 @@ flowchart LR
 | R7 | manifest のデプロイ自動化 (CI/CD) | **実施** | 利用 |
 | R8 | アプリでの Secret の利用 | | **実施** |
 
-※ ExternalSecret はアプリの Namespace の中に作るリソースなので、アプリチームだけで作成・変更できる。プラットフォームチームが 1 件ずつ確認しなくてよいのは、**取得できる範囲が R2・R5 で先に決まっているため**。ExternalSecret に他のアプリのシークレット名を書いても、OCI 側の IAM ポリシーで拒否される (6.4.2)。
+※ ExternalSecret はアプリの Namespace の中に作るリソースなので、アプリチームだけで作成・変更できる。プラットフォームチームが 1 件ずつ確認しなくてよいのは、**取得できる範囲が、プラットフォームチームが用意する SecretStore (R5) と保管庫側の権限 (R2) で先に決まっているため**。
 
-### 6.3 将来の案: アプリチームにも権限を渡す場合
-アプリチームがコンソールを操作できるようになったら、**自分のアプリ分の Secret に限って**値の登録・更新を行えるようにする (アプリごとのコンパートメントにだけ権限を付与。6.4.2)。
-
-| 項番 (6.2) | 作業 | 現状 | 将来 |
-|---|---|---|---|
-| R3 | Secret の値の登録・更新 | プラットフォーム | **アプリ (自分の範囲のみ)** |
-| R2 | 保管庫の作成、IAM の設定 | プラットフォーム | プラットフォーム (変更なし) |
-| R5 | ServiceAccount と SecretStore の作成 | プラットフォーム | プラットフォーム (変更なし) |
-| R1、R4、R6〜R8 | — | 変更なし | 変更なし |
-
-### 6.4 運用設計 (案)
-開発・テスト・本番の各環境 (クラスタは環境ごとに分ける) を対象とした案を示す。決定が必要な事項は 8 章にまとめる。
-
-#### 6.4.1 Secret の値の受け渡し方法
-チャットやメールに平文で書かないことが前提。どの案を採るかは 8 章 No. 1。
+### 6.2 Secret の値の受け渡し方法
+チャットやメールに平文で書かないことが前提。
 
 | 案 | 内容 | 評価 |
 |---|---|---|
-| A. アプリチームが保管庫に直接登録 | 6.3 の将来案。アプリのコンパートメントにだけシークレットの登録権限を付与する | 受け渡しそのものが不要になる。コンソール権限の付与が前提 |
+| A. アプリチームが保管庫に直接登録 | アプリチームに保管庫への登録権限を付与する | 受け渡しそのものが不要になる。コンソール権限の付与と、アプリ間の権限の分け方 (6.3) の決定が前提 |
 | B. 開発環境から先に A を適用 | 開発環境はアプリチームが登録し、テスト・本番はプラットフォームチームが登録する | 段階的に移行できる |
 | C. 既存の社内の仕組みを使う | パスワード管理ツール、アクセス制限付きのファイル共有 (パスワードは別経路) など | 社内で使えるものの棚卸しが必要 |
 
-#### 6.4.2 権限の設計 (OCI + Workload Identity の案)
+### 6.3 権限の設計 (OCI + Workload Identity の案)
+開発・テスト・本番の各環境 (クラスタは環境ごとに分ける) を対象とする。
 
 **OCI のリソースの関係と単位**
 
 | リソース | 役割 | 単位・制約 | 設計案 |
 |---|---|---|---|
-| コンパートメント | リソースを入れるフォルダ。権限はこの単位で付けるのが基本 | 階層を作れる | 環境ごと (開発 / テスト / 本番) に作り、その下にアプリごとに作る |
-| Vault | 暗号化キーを入れる入れ物 | 1 つのコンパートメントに属する。同じコンパートメントに複数作れる | 環境ごとに 1 つ (環境のコンパートメントに置く) |
-| マスター暗号化キー | シークレットを暗号化する鍵 | 1 つの Vault の中に作る。1 つのキーで複数のシークレットを暗号化できる | 環境ごとに 1 つ (アプリごとに分ける必要が出たら追加) |
-| シークレット | 値そのもの | 作成時に「置くコンパートメント」「Vault」「キー」を選ぶ。置くコンパートメントは Vault と別にできる | アプリのコンパートメントに置く |
-
-関係: コンパートメント ⊃ Vault ⊃ マスター暗号化キー → (暗号化) → シークレット (アプリのコンパートメントに配置)
+| コンパートメント | リソースを入れるフォルダ。権限はこの単位で付けるのが基本 | 階層を作れる | 環境ごと (開発 / テスト / 本番) |
+| Vault | 暗号化キーを入れる入れ物 | 1 つのコンパートメントに属する。同じコンパートメントに複数作れる | 環境ごとに 1 つ (アプリ間の分け方によっては複数。下表) |
+| マスター暗号化キー | シークレットを暗号化する鍵 | 1 つの Vault の中に作る。1 つのキーで複数のシークレットを暗号化できる | Vault ごとに 1 つ |
+| シークレット | 値そのもの | 作成時に「置くコンパートメント」「Vault」「キー」を選ぶ | 環境のコンパートメントに置く |
 
 **IAM ポリシーとは**
 
@@ -372,13 +332,20 @@ Allow <誰が> to <何をする> <何に> in compartment <どこで> where <条�
 | 何をする | `read` (読み取り) / `use` (利用) / `manage` (作成・変更・削除) |
 | 何に | `secret-bundles` (シークレットの値) / `secret-family` (シークレット一式) / `vaults` / `keys` |
 
-本設計のポリシー (本番・アプリ A の例。他の環境・アプリも同じ形):
+本設計のポリシー (本番の例。他の環境も同じ形):
 
 | 対象 | ポリシー |
 |---|---|
-| ESO (アプリ A の ServiceAccount) | `Allow any-user to read secret-bundles in compartment prod:app-a where all { request.principal.type = 'identityfederateddomainapp', request.principal.name = 'system:serviceaccount:app-a:eso-app-a', request.principal.ext_iss = '<本番クラスタの発行者>' }` と、同じ条件で `read vaults in compartment prod` (ESO が SecretStore の接続確認で Vault の情報を読むため) |
+| ESO (アプリの ServiceAccount) | `Allow any-user to read secret-bundles in compartment prod where all { request.principal.type = 'identityfederateddomainapp', request.principal.name = 'system:serviceaccount:<Namespace>:<ServiceAccount>', request.principal.ext_iss = '<本番クラスタの発行者>' }` と、同じ条件で `read vaults` (ESO が SecretStore の接続確認で Vault の情報を読むため)。アプリ間で分ける場合は下表の条件を追加する |
 | プラットフォームチーム | `Allow group platform-admins to manage vaults / keys / secret-family in compartment prod` (3 行) |
-| アプリ A の担当者 (6.3 の将来案) | `Allow group app-a-secret-admins to manage secret-family in compartment prod:app-a` と、暗号化キーの `use` 権限 |
+
+**アプリ間の分け方 (候補)**
+
+| 案 | 内容 | 留意点 |
+|---|---|---|
+| a. シークレット名で分ける | ポリシーの条件にシークレット名 (`target.secret.name`) を加え、アプリごとに読めるシークレットを限定する | 命名規則が前提。条件の書き方は確認が必要 |
+| b. Vault をアプリごとに分ける | 同じコンパートメントにアプリごとの Vault を作り、条件で Vault (`target.vault.id`) を限定する | Vault とキーの数が増える。条件として使えるかは確認が必要 |
+| c. 分けない | 環境単位でのみ分ける。アプリ間は OpenShift 側 (SecretStore の作成権限) で担保する | 構成は最も簡単。IAM ではアプリを区別しない |
 
 **権限分離の全体図**
 
@@ -388,11 +355,11 @@ flowchart LR
     direction TB
     ESO["ESO"]
     subgraph NSA["Namespace: アプリ A"]
-      ESA["ExternalSecret"] --> SSA["SecretStore"] --> SAA["ServiceAccount<br/>eso-app-a"]
+      ESA["ExternalSecret"] --> SSA["SecretStore"] --> SAA["ServiceAccount A"]
       SECA["Secret"]
     end
     subgraph NSB["Namespace: アプリ B"]
-      ESB["ExternalSecret"] --> SSB["SecretStore"] --> SAB["ServiceAccount<br/>eso-app-b"]
+      ESB["ExternalSecret"] --> SSB["SecretStore"] --> SAB["ServiceAccount B"]
     end
   end
   subgraph OCI["OCI テナンシ"]
@@ -400,48 +367,43 @@ flowchart LR
     TRUST["信頼設定<br/>(クラスタごと)"]
     subgraph CENV["コンパートメント: 環境"]
       direction TB
-      VAULT["Vault +<br/>マスター暗号化キー"]
-      subgraph CA["コンパートメント: アプリ A"]
-        SEC_A["シークレット"]
-      end
-      subgraph CB["コンパートメント: アプリ B"]
-        SEC_B["シークレット"]
-      end
+      VAULT["Vault + マスター暗号化キー"]
+      SEC_A["シークレット (アプリ A)"]
+      SEC_B["シークレット (アプリ B)"]
     end
   end
   SAA -- "トークン交換" --> TRUST
   SAB -- "トークン交換" --> TRUST
-  ESO -- "SA A の権限: アプリ A のみ read" --> SEC_A
-  ESO -- "SA B の権限: アプリ B のみ read" --> SEC_B
+  ESO -- "SA A の権限で read" --> SEC_A
+  ESO -- "SA B の権限で read" --> SEC_B
   ESO -- "同期" --> SECA
   VAULT -. "暗号化" .-> SEC_A
   VAULT -. "暗号化" .-> SEC_B
   classDef pf fill:#dbeafe,stroke:#1d4ed8,color:#0f172a
   classDef app fill:#dcfce7,stroke:#15803d,color:#0f172a
-  class ESO,SSA,SSB,SAA,SAB,TRUST,VAULT pf
+  class ESO,SSA,SSB,SAA,SAB,TRUST,VAULT,SEC_A,SEC_B pf
   class ESA,ESB app
 ```
-青: プラットフォームチームが管理 / 緑: アプリチームが管理 / シークレットの値: 現状はプラットフォーム、将来はアプリ (6.3)
+青: プラットフォームチームが管理 / 緑: アプリチームが管理
 
 **境界ごとの分け方**
 
-| 境界 | 分ける単位 | 担保する仕組み | 管理 |
-|---|---|---|---|
-| 環境 (開発 / テスト / 本番) | クラスタ、環境のコンパートメント、Vault | クラスタごとの信頼設定と、IAM ポリシーの発行者 (`ext_iss`) の条件 | プラットフォーム |
-| アプリ | Namespace、ServiceAccount、アプリのコンパートメント | IAM ポリシーの ServiceAccount 名の条件 (自分のコンパートメントだけ読める) | プラットフォーム |
-| クラスタ内の操作 | Namespace | OpenShift の RBAC (アプリチームは自分の Namespace の中だけ操作できる) | プラットフォーム |
-| 値の登録・更新 | アプリのコンパートメント | IAM グループとポリシー | 現状プラットフォーム、将来アプリ |
-| 暗号化キー | Vault / マスター暗号化キー | キーの `manage` はプラットフォームのみ | プラットフォーム |
+| 境界 | 分ける単位 | 担保する仕組み |
+|---|---|---|
+| 環境 (開発 / テスト / 本番) | クラスタ、環境のコンパートメント、Vault | クラスタごとの信頼設定と、IAM ポリシーの発行者 (`ext_iss`) の条件 |
+| アプリ | Namespace、ServiceAccount | IAM ポリシーの ServiceAccount 名の条件と、上表の a〜c のいずれか |
+| クラスタ内の操作 | Namespace | OpenShift の RBAC (アプリチームは自分の Namespace の中だけ操作できる) |
+| 保管庫・暗号化キーの管理 | 環境のコンパートメント | IAM グループとポリシー (プラットフォームチームのみ) |
 
-#### 6.4.3 運用フロー (案)
+### 6.4 運用フロー (案)
 
 **新しい Secret を追加する**
 
 | 順 | 作業 | 担当 | 項番 |
 |---|---|---|---|
 | 1 | 必要な Secret (名前・用途・更新頻度) を申請 | アプリ | R1 |
-| 2 | アプリを初めて載せる場合のみ: アプリのコンパートメント、IAM ポリシー、ServiceAccount、SecretStore を各環境に用意 | プラットフォーム | R2、R5 |
-| 3 | 開発 → テスト → 本番の順に値を登録 (受け渡しは 6.4.1) | プラットフォーム (将来アプリ) | R3 |
+| 2 | アプリを初めて載せる場合のみ: IAM ポリシー、ServiceAccount、SecretStore を各環境に用意 | プラットフォーム | R2、R5 |
+| 3 | 開発 → テスト → 本番の順に値を登録 (受け渡しは 6.2) | プラットフォーム | R3 |
 | 4 | ExternalSecret を Git に登録 | アプリ | R6 |
 | 5 | デプロイし、Secret が作成されたことを確認 | CI/CD → アプリ | R7、R8 |
 
@@ -449,49 +411,36 @@ flowchart LR
 
 | 順 | 作業 | 担当 |
 |---|---|---|
-| 1 | 保管庫に新しいバージョンを登録 | プラットフォーム (将来アプリ) |
-| 2 | `refreshInterval` 後に Secret へ自動反映 | (自動) |
+| 1 | 保管庫に新しいバージョンを登録 | プラットフォーム |
+| 2 | `refreshInterval` 後に Secret へ自動反映 (3.1) | (自動) |
 | 3 | アプリへの反映: 環境変数で参照している場合は Pod の再起動が必要。ボリュームで参照している場合は自動で反映される | アプリ |
 
-| 環境 | 運用の違い (案) |
-|---|---|
-| 開発 | アプリチームへの登録権限の付与を先行してよい (6.4.1 案 B)。`refreshInterval` は短めでも可 |
-| テスト / 本番 | 値の登録はプラットフォームチーム (または申請・承認つき)。`refreshInterval` は既定の `1h` を基本とする |
-
-## 7. 導入にあたっての留意点
-| 項目 | 内容 |
-|---|---|
-| サポート範囲 | OCI Vault は Red Hat の動作確認対象の一覧に含まれない (本検証で動作は確認済み)。AWS Secrets Manager 等はバージョン別に確認 |
-| 認証方式 | 検証は簡易な方式 (API キー)。本番は ROSA は STS (標準)、OCI は Workload Identity を候補とする (5.2.1、8 章) |
-| etcd 上の Secret | ESO は etcd に Secret を残す → etcd 暗号化と RBAC を前提にする |
-| 保管庫の可用性 | 同期済み Secret があれば稼働は継続。停止中は更新・新規 Secret が反映されない |
-| 権限の設計 | ESO に渡す保管庫の権限は、アプリごとに最小限にする (6.4.2) |
-
-## 8. 今後の検討事項
+## 7. 今後の検討事項
 本書の内容のうち、今後決定が必要な事項と、確認を進めている事項をまとめる。
 
 | No. | 区分 | 事項 | 内容・現時点の案 | 状況 | 関連 |
 |---|---|---|---|---|---|
-| 1 | 運用 | Secret の値の受け渡し方法 | 案 A (アプリチームが保管庫に直接登録)・B (開発環境から段階的に A)・C (社内の既存の仕組み) から選ぶ。C の場合は利用できる仕組みの確認が必要 | 決定が必要 | 6.4.1 |
-| 2 | 運用 | アプリチームへの権限委譲の範囲と時期 | 自分のアプリのシークレットの登録・更新に限って委譲する。開発環境から先行する案 | 決定が必要 | 6.3 |
-| 3 | 運用 | 運用フローの確定 | 申請・承認の要否、環境ごとの担当 | 決定が必要 | 6.4.3 |
-| 4 | 権限 | OCI のコンパートメント・Vault・キーの構成 | 環境ごとに Vault とキーを 1 つ、シークレットはアプリごとのコンパートメントに置く案 | 決定が必要 | 6.4.2 |
-| 5 | 認証 (OCI) | Workload Identity の OpenShift 上の ESO での利用可否 | ESO の OCI 用の Workload 設定は OKE 向けの仕組みを前提にしているため、OpenShift で利用できるかを確認する | 確認中 | 5.2.1 |
-| 6 | 認証 (OCI) | クラスタの見分け方 | OpenShift の発行者 (issuer) が既定値のままだと全クラスタで同じ値になる。クラスタごとに発行者を変えるか、環境ごとにアイデンティティ・ドメインを分ける | 確認中 | 6.4.2 |
-| 7 | 認証 (OCI) | トークン交換用の資格情報の保管 | トークン交換用アプリのクライアントシークレットの保管方法 | 確認中 | 5.2.1 |
-| 8 | 認証 (OCI) | 署名鍵の変更への追従 | OpenShift の署名鍵が変わったときの信頼設定の更新方法 | 確認中 | 5.2.1 |
-| 9 | 認証 (OCI) | No. 5 が困難な場合の代替 (Instance Principal) | 権限がノード単位になるため、下表の対策とあわせて評価する | 確認中 | 5.2.1 |
-| 10 | 認証 (OCI) | API キー方式の専用ユーザーの単位 | 環境ごと、または環境 × アプリごと。アプリごとに分けるとアプリ間の分離を IAM で担保できるが、管理するキーが増える | 決定が必要 | 5.2.2 |
-| 11 | 認証 (OCI) | API キーのローテーションの周期と実施者 | 止めずに入れ替える手順を想定。周期は社内規程に合わせる | 決定が必要 | 5.2.2 |
-| 12 | 認証 (OCI) | API キーを使える場所の制限 | 通信元 IP の条件を IAM ポリシーに付けられるか (クラスタの出口 IP が固定か) | 決定が必要 | 5.2.2 |
-| 13 | 認証 (OCI) | Workload Identity へ移行する条件と時期 | No. 5〜8 の確認結果を踏まえて決める | 決定が必要 | 5.2.1・5.2.2 |
-| 14 | 通信 | ESO の外向き通信の宛先の絞り込み | 検証では宛先を限定せずに許可した。本番では閉域の接続経路 (VPC エンドポイント等) や宛先の制限を検討する | 決定が必要 | 5.1 |
+| 1 | 運用 | Secret の値の受け渡し方法 | 案 A (アプリチームが保管庫に直接登録)・B (開発環境から段階的に A)・C (社内の既存の仕組み) から選ぶ | 決定が必要 | 6.2 |
+| 2 | 運用 | 値の登録・更新をアプリチームに任せるか | 任せる場合は、アプリ間の分け方 (No. 5) とコンソール権限の付与が前提 | 決定が必要 | 6.1・6.2 |
+| 3 | 運用 | 運用フローの確定 | 申請・承認の要否、環境ごとの担当 | 決定が必要 | 6.4 |
+| 4 | 権限 | OCI のコンパートメント・Vault・キーの構成 | 環境ごとにコンパートメントを分け、Vault とキーを置く案 | 決定が必要 | 6.3 |
+| 5 | 権限 | アプリ間の分け方 | a (シークレット名)・b (アプリごとの Vault)・c (分けない) から選ぶ。a・b は IAM ポリシーの条件の使い方を確認する | 決定が必要 | 6.3 |
+| 6 | 認証 (OCI) | Workload Identity の OpenShift 上の ESO での利用可否 | ESO の OCI 用の Workload 設定は OKE 向けの仕組みを前提にしているため、OpenShift で利用できるかを確認する | 確認中 | 5.2.1 |
+| 7 | 認証 (OCI) | クラスタの見分け方 | OpenShift の発行者 (issuer) が既定値のままだと全クラスタで同じ値になる。クラスタごとに発行者を変えるか、環境ごとにアイデンティティ・ドメインを分ける | 確認中 | 6.3 |
+| 8 | 認証 (OCI) | トークン交換用の資格情報の保管 | トークン交換用アプリのクライアントシークレットの保管方法 | 確認中 | 5.2.1 |
+| 9 | 認証 (OCI) | 署名鍵の変更への追従 | OpenShift の署名鍵が変わったときの信頼設定の更新方法 | 確認中 | 5.2.1 |
+| 10 | 認証 (OCI) | No. 6 が困難な場合の代替 (Instance Principal) | 権限がノード単位になるため、下表の対策とあわせて評価する | 確認中 | 5.2.1 |
+| 11 | 認証 (OCI) | API キー方式の専用ユーザーの単位 | 環境ごと、または環境 × アプリごと。アプリごとに分けるとアプリ間の分離を IAM で担保できるが、管理するキーが増える | 決定が必要 | 5.2.2 |
+| 12 | 認証 (OCI) | API キーのローテーションの周期と実施者 | 止めずに入れ替える手順を想定。周期は社内規程に合わせる | 決定が必要 | 5.2.2 |
+| 13 | 認証 (OCI) | API キーを使える場所の制限 | 通信元 IP の条件を IAM ポリシーに付けられるか (クラスタの出口 IP が固定か) | 決定が必要 | 5.2.2 |
+| 14 | 認証 (OCI) | Workload Identity へ移行する条件と時期 | No. 6〜9 の確認結果を踏まえて決める | 決定が必要 | 5.2.1・5.2.2 |
+| 15 | 通信 | ESO の外向き通信の宛先の絞り込み | 検証では宛先を限定せずに許可した。本番では閉域の接続経路 (VPC エンドポイント等) や宛先の制限を検討する | 決定が必要 | 5.1 |
 
-**No. 9 (Instance Principal) を採る場合の論点**
+**No. 10 (Instance Principal) を採る場合の論点**
 
 | 論点 | 内容 |
 |---|---|
-| アプリ間の分離 | IAM ではアプリを区別できない (同じノードの ID で取得する)。アプリごとのコンパートメントを分けても、ESO 経由ではすべて読める |
+| アプリ間の分離 | IAM ではアプリを区別できない (同じノードの ID で取得する)。シークレット名や Vault で分けても、ESO 経由ではすべて読める |
 | SecretStore の作成権限 | SecretStore に資格情報を書かなくても接続できるため、作れる人はノードの権限をすべて使える → 作成はプラットフォームチームのみ (RBAC) とし、アプリ間の分離はここで担保する |
 | 対象ノードの限定 | ESO を Infra ノード等に寄せ、Dynamic Group をそのノードだけに絞る (タグ等で指定) |
 | 他の Pod からの利用 | 同じノード上の他の Pod がメタデータ (169.254.169.254) 経由で同じ権限を使えないようにする通信制御 |
@@ -504,4 +453,3 @@ flowchart LR
 - [Oracle Vault provider (external-secrets.io)](https://external-secrets.io/latest/provider/oracle-vault/) — OCI の認証方式 (User / Instance Principal / Workload Identity)
 - [Workload Identity for Self-Managed Kubernetes (Oracle ブログ)](https://blogs.oracle.com/cloud-infrastructure/workload-identity-for-self-managed-k8s) — OCI の自己管理 Kubernetes 向け Workload Identity
 - [Vault の IAM ポリシー リファレンス (OCI)](https://docs.oracle.com/en-us/iaas/Content/Identity/Reference/keypolicyreference.htm) — `secret-bundles` などのリソース種別と条件
-- [Oracle Cloud セキュリティ価格表](https://www.oracle.com/cloud/security/pricing.html) — OCI Vault / Secret Management の料金
