@@ -35,6 +35,7 @@
 
 ![標準 Secret と ESO の比較: 標準 Secret はクラスタ内で手作業管理し base64 エンコードのみ。ESO は外部の保管庫を値の正として自動で同期する](docs/images/secret-management-methods.svg)
 
+どちらの方式でも、クラスタ内の Secret 自体は base64 で保存される。etcd の暗号化と RBAC は共通の前提とする (4 章)。
 
 ## 3. ESO の仕組み
 
@@ -51,6 +52,7 @@
 
 > スコープ: 「クラスタ」は Namespace に属さずクラスタ全体で 1 つの名前空間を持つリソース、「Namespace」は Namespace の中に作るリソース。OpenShift 上の全リソースの一覧は 5.4。
 
+- 図の ① ESO が保管庫から定期的に値を取得し、② Secret を作成・更新する。③ アプリはその Secret を参照する。
 - 保管庫側で値を更新すれば、`refreshInterval` ごとの再取得で自動的に Secret へ反映される (検証では 1 分周期)。
 - アプリは Kubernetes 標準の Secret を環境変数 / ボリュームで参照する、**一般的なコンテナアプリと同じ作り方**でよい。ESO 専用の SDK やコードは不要で、アプリは保管庫の存在を意識しない。
 - Git に置くのは「参照の定義」だけで、値そのものは置かない。
@@ -252,7 +254,8 @@ Allow <誰が> to <何をする> <何に> in compartment <どこで> where <条�
 **権限分離の全体図**
 
 ![権限分離の全体図 (OCI + Workload Identity の案)](docs/images/permission-separation.svg)
-青: プラットフォームチームが管理 / 緑: アプリチームが管理
+
+図の ① ESO が ServiceAccount のトークンを OCI のトークンに交換し、② ServiceAccount ごとの権限でシークレットを読む。
 
 **境界ごとの分け方**
 
