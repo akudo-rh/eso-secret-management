@@ -116,7 +116,7 @@ def d_challenges(out):
         s.text(102, y + 32, "×", F_MAIN, RED, True)
     s.big_arrow(560, 265)
     s.panel(660, 100, 500, 330, "目指す状態", "teal")
-    for i, t in enumerate(["値の正は専用の保管庫に 1 か所", "アプリには必要な時だけ安全に渡す", "Git には値を置かない", "更新・権限を保管庫側で一元管理"]):
+    for i, t in enumerate(["値は専用の保管庫 1 か所で管理", "アプリには必要な時だけ安全に渡す", "Git には値を置かない", "更新・権限を保管庫側で一元管理"]):
         y = 170 + i * 62
         s.box(700, y, 420, 50, t, "pf")
         s.text(722, y + 32, "✓", F_MAIN, TEAL_D, True)
@@ -130,15 +130,14 @@ def d_methods(out):
     s.box(62, 200, 100, 60, "担当者", "plain")
     s.arrow([(166, 230), (318, 230)], "#6b6b6b", 2)
     s.text(242, 216, "oc create secret", 14, TXT2, mono=True)
-    s.box(324, 186, 214, 88, ["Secret", "クラスタ (etcd) 内"], "warn")
-    s.text(431, 306, "↑ base64 エンコードのみ", F_LABEL, RED, True)
-    s.text(431, 330, "（暗号化ではない）", F_LABEL, RED, True)
+    s.box(324, 186, 214, 88, ["Secret", "クラスタ (etcd) 内"], "plain")
+    s.text(300, 312, "↑ 作成・更新は 1 つずつ手作業", F_LABEL, RED, True)
     s.big_arrow(581, 225)
     s.panel(680, 100, 480, 250, "② ESO：外部の保管庫から自動で同期", "teal")
     s.box(704, 180, 190, 104, ["外部の保管庫", "AWS Secrets Manager", "OCI Vault など"], "vault")
     s.arrow([(898, 232), (984, 232)], TEAL, 2.5, label="同期", lx=941, ly=218)
     s.box(990, 196, 146, 72, ["Secret", "自動で作成"], "auto")
-    s.text(799, 318, "↑ 値の正はここ 1 か所", F_LABEL, TEAL_D, True)
+    s.text(799, 318, "↑ 値の管理元はここ 1 か所", F_LABEL, TEAL_D, True)
     s.save(out / "secret-management-methods.svg")
 
 
@@ -211,15 +210,52 @@ def d_rosa(out):
 
 def d_oci_apikey(out):
     s = SVG(80, 440)
-    _auth_base(s, "OpenShift on OCI", "OCI")
-    s.box(70, 168, 340, 74, ["ESO", "SecretStore の設定で動作"], "pfstrong")
-    s.box(70, 310, 340, 74, ["Secret (API キー)", "秘密鍵とフィンガープリント"], "warn")
-    s.box(670, 168, 460, 74, ["OCI Vault", "シークレットの保管"], "vault")
-    s.box(670, 310, 460, 74, ["IAM ポリシー", "API キーのユーザーに読み取りを許可"], "pf")
-    s.arrow([(240, 307), (240, 246)], "#6b6b6b", 2, True, "参照", 252, 284, "start")
-    s.arrow([(412, 205), (667, 205)], TEAL, 3, label="API キーで署名して取得", lx=540, ly=192)
-    s.arrow([(900, 308), (900, 246)], "#6b6b6b", 2, True, "許可", 912, 284, "start")
+    s.panel(40, 100, 380, 320, "OpenShift on OCI", "outline")
+    s.panel(760, 100, 400, 320, "OCI", "gray")
+    s.box(65, 168, 330, 74, ["ESO", "SecretStore の設定で動作"], "pfstrong")
+    s.box(65, 310, 330, 74, ["Secret (API キー)", "秘密鍵とフィンガープリント"], "warn")
+    s.box(785, 168, 350, 74, ["OCI Vault", "シークレットの保管"], "vault")
+    s.box(785, 310, 350, 74, ["OCI ユーザー", "API キーを登録"], "pf")
+    s.box(500, 310, 180, 74, ["作業端末", "秘密鍵 (一時的)"], "plain")
+    s.arrow([(783, 347), (683, 347)], TEAL, 2.5)
+    s.badge(733, 347, "①")
+    s.arrow([(498, 347), (398, 347)], TEAL, 2.5)
+    s.badge(448, 347, "②")
+    s.arrow([(230, 307), (230, 246)], "#6b6b6b", 2, True, "参照", 242, 284, "start")
+    s.arrow([(397, 205), (782, 205)], TEAL, 3)
+    s.badge(590, 205, "③")
+    s.arrow([(960, 308), (960, 246)], "#6b6b6b", 2, True, ["IAM ポリシーで", "読み取りを許可"], 972, 270, "start")
     s.save(out / "oci-apikey-auth.svg")
+
+
+def d_apikey_lifecycle(out):
+    s = SVG(110, 470)
+    steps = [(["専用ユーザーで", "API キーを作成"], "pf"), (["秘密鍵を", "ダウンロード"], "pf"),
+             (["OpenShift に", "Secret として登録"], "pf"), (["作業端末の", "秘密鍵を削除"], "pf")]
+    w, gap = 250, 40
+    for i, (t, st) in enumerate(steps):
+        x = 40 + i * (w + gap)
+        s.box(x, 140, w, 90, t, st)
+        s.badge(x + 24, 140, str(i + 1))
+        if i < 3:
+            s.arrow([(x + w + 3, 185), (x + w + gap - 3, 185)], TEAL, 2.5)
+    notes = [["権限は読み取りのみ", "(secret-bundles / vaults)"], ["再取得できない", "紛失したら作り直す"],
+             ["プラットフォームチームだけが", "参照できる Namespace に置く"], ["Secret 以外に", "秘密鍵を残さない"]]
+    for i, lines in enumerate(notes):
+        x = 40 + i * (w + gap)
+        for k, ln in enumerate(lines):
+            s.text(x + w / 2, 262 + k * 24, ln, F_LABEL, TXT2)
+    # ローテーション
+    s.add(f'<rect x="40" y="330" width="1120" height="120" rx="16" fill="{GRAY_L}"/>')
+    s.text(60, 364, "ローテーション (止めずに入れ替え)", F_LABEL, TEAL_D, True, anchor="start")
+    rot = ["新しいキーを追加", "Secret を差し替え", "同期を確認", "古いキーを削除"]
+    w2, gap2 = 230, 50
+    for i, t in enumerate(rot):
+        x = 80 + i * (w2 + gap2)
+        s.box(x, 388, w2, 46, t, "plain")
+        if i < 3:
+            s.arrow([(x + w2 + 3, 411), (x + w2 + gap2 - 3, 411)], TEAL, 2.5)
+    s.save(out / "apikey-lifecycle.svg")
 
 
 def d_oci_wi(out):
@@ -323,7 +359,7 @@ def d_flow(out):
 if __name__ == "__main__":
     out = Path(sys.argv[1])
     out.mkdir(parents=True, exist_ok=True)
-    for f in (d_challenges, d_methods, d_eso_mechanism, d_install_steps, d_rosa, d_oci_apikey, d_oci_wi,
+    for f in (d_challenges, d_methods, d_eso_mechanism, d_install_steps, d_rosa, d_oci_apikey, d_apikey_lifecycle, d_oci_wi,
               d_scope, d_roles, d_permissions, d_flow):
         f(out)
     print("generated")
