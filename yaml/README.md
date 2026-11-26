@@ -2,12 +2,20 @@
 
 検証で使った manifest のひな形。手順は [docs/](../docs/) を参照。
 
-| パス | 内容 | 手順 |
-|---|---|---|
-| `common/` | 検証用 Namespace | — |
-| `eso/oci/` | ESO × OCI Vault (認証情報の例、SecretStore、ExternalSecret) | [eso-oci-vault-verification.md](../docs/eso-oci-vault-verification.md) |
-| `eso/aws/` | ESO × AWS Secrets Manager (ROSA / STS) | [eso-rosa-verification.md](../docs/eso-rosa-verification.md) |
-| `aws-iam/` | IAM Role の信頼ポリシー / 権限ポリシーのひな形 | 同上 §4.3 |
+| ファイル | リソース (スコープ) | 置く Namespace | 環境 | 手順 |
+|---|---|---|---|---|
+| `common/namespaces.yaml` | Namespace (クラスタ) | — | 共通 | 各手順書 §4 |
+| `eso/aws/networkpolicy-allow-aws-egress.yaml` | NetworkPolicy (Namespace) | `external-secrets` (固定) | ROSA | [eso-rosa-verification.md](../docs/eso-rosa-verification.md) §4.4.1 |
+| `eso/aws/serviceaccount.yaml` | ServiceAccount (Namespace) | `<TARGET_NAMESPACE>` | ROSA | 同上 §4.4.2 |
+| `eso/aws/secretstore.yaml` | SecretStore (Namespace) | `<TARGET_NAMESPACE>` | ROSA | 同上 §4.4.2 |
+| `eso/aws/externalsecret.yaml` | ExternalSecret (Namespace) | `<TARGET_NAMESPACE>` | ROSA | 同上 §4.5 |
+| `aws-iam/*.json` | AWS IAM のポリシー (OpenShift のリソースではない) | — | ROSA | 同上 §4.3 |
+| `eso/oci/01-oci-credentials_example.yaml` | Secret (Namespace)。書式の参考用 | `<TARGET_NAMESPACE>` | OCI | [eso-oci-vault-verification.md](../docs/eso-oci-vault-verification.md) §4.3 |
+| `eso/oci/02-secretstore.yaml` | SecretStore (Namespace) | `<TARGET_NAMESPACE>` | OCI | 同上 §4.4 |
+| `eso/oci/03-externalsecret.yaml` | ExternalSecret (Namespace) | `<TARGET_NAMESPACE>` | OCI | 同上 §4.5 |
+
+- スコープ: 「クラスタ」は Namespace に属さないリソース、「Namespace」は Namespace の中に作るリソース。
+- `ExternalSecretsConfig` (クラスタ) は手順書の中で直接作成するため、ファイルは置いていない。OpenShift 上の全リソースの一覧は [README 5.4](../README.md#54-openshift-上で作成するリソースとスコープ)。
 
 ## 置き換える値
 

@@ -4,7 +4,7 @@ ROSA クラスタに External Secrets Operator (ESO) を導入し、Secret が�
 **ROSA と AWS だけで完結**する構成 (外部ストアは AWS Secrets Manager、認証は ROSA の STS / OIDC)。
 
 - 検証に使う YAML → [yaml/eso/aws/](../yaml/eso/aws/)、[yaml/aws-iam/](../yaml/aws-iam/)
-- YAML / JSON 内の `<...>` は、§2.2 で確認した自分の環境の値に置き換えてから使う。プレースホルダの一覧は [yaml/README.md](../yaml/README.md)。
+- YAML / JSON 内の `<...>` は、§2.2 で確認した自分の環境の値に置き換えてから使う。プレースホルダの一覧は [yaml/README.md](../yaml/README.md)。 作成する OpenShift リソースのスコープ (クラスタ / Namespace) は [README 5.4](../README.md#54-openshift-上で作成するリソースとスコープ) を参照。
 - コマンドの `<TARGET_NAMESPACE>` などは YAML と同じプレースホルダ。本書の検証では `eso-test` を使った。
 
 ## 0. 検証開始前に確定させる項目 (ヒアリング・確認事項)

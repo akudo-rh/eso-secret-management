@@ -3,7 +3,7 @@
 OpenShift on OCI 上のクラスタに External Secrets Operator (ESO) を導入し、OCI Vault のシークレットを Kubernetes Secret として同期できることを確認する手順。
 
 - 検証に使った YAML → [yaml/eso/oci/](../yaml/eso/oci/)
-- YAML とコマンドの `<...>` は §2.2 で確認した値に置き換える。OpenShift 上のリソース名のプレースホルダ (`<TARGET_NAMESPACE>` など) は [yaml/README.md](../yaml/README.md) を参照。本書の検証では `eso-test` / `oci-vault` / `demo-secret` / `oci-credentials` を使い、実行結果のログはその値のまま載せている。
+- YAML とコマンドの `<...>` は §2.2 で確認した値に置き換える。OpenShift 上のリソース名のプレースホルダ (`<TARGET_NAMESPACE>` など) は [yaml/README.md](../yaml/README.md) を参照。 作成する OpenShift リソースのスコープ (クラスタ / Namespace) は [README 5.4](../README.md#54-openshift-上で作成するリソースとスコープ) を参照。本書の検証では `eso-test` / `oci-vault` / `demo-secret` / `oci-credentials` を使い、実行結果のログはその値のまま載せている。
 
 ## 0. 検証開始前に確定させる項目 (ヒアリング・確認事項)
 
@@ -99,6 +99,7 @@ oc delete pod curl -n default
 ```
 HTTP コードが返れば (401 / 403 / 404 でも) 到達 OK。タイムアウトは egress 制限。ホスト名はサービス・リージョンにより異なるため、ESO のログ (`oc logs -n external-secrets deploy/external-secrets`) の接続先で最終確認する。
 ※ ここで到達できても、ESO の Pod からは到達できない場合がある (ROSA + AWS では実際に発生。[eso-rosa-verification.md](eso-rosa-verification.md) §4.4.1)。ESO の Pod だけタイムアウトする場合は、`external-secrets` Namespace の NetworkPolicy (`oc get networkpolicy -n external-secrets`) を確認する。
+※ 本検証 (OCI) では、ROSA で必要だった外向き通信の NetworkPolicy を追加しなくても ESO から OCI Vault に接続できた。タイムアウトする場合は ROSA 版と同じ NetworkPolicy ([yaml/eso/aws/networkpolicy-allow-aws-egress.yaml](../yaml/eso/aws/networkpolicy-allow-aws-egress.yaml)) を追加する。
 
 ## 3. 導入手順と結果
 

@@ -64,11 +64,14 @@ flowchart TB
   ESO -- "① 認証して取得 (定期的)" --> V
 ```
 
-| リソース | 役割 | 作る人 |
-|---|---|---|
-| SecretStore | 保管庫への接続先と認証方法 | プラットフォームチーム |
-| ExternalSecret | どの値を、どの名前の Secret にするか | アプリチーム |
-| Kubernetes Secret | ESO が自動で作成・更新する (**手で作らない**) | (自動) |
+| リソース | スコープ | 役割 | 作る人 |
+|---|---|---|---|
+| SecretStore | Namespace | 保管庫への接続先と認証方法 (同じ Namespace の ExternalSecret だけが使える) | プラットフォームチーム |
+| ClusterSecretStore | クラスタ | SecretStore のクラスタ共通版 (複数の Namespace から使える) | プラットフォームチーム |
+| ExternalSecret | Namespace | どの値を、どの名前の Secret にするか | アプリチーム |
+| Kubernetes Secret | Namespace | ESO が ExternalSecret と同じ Namespace に自動で作成・更新する (**手で作らない**) | (自動) |
+
+> スコープ: 「クラスタ」は Namespace に属さずクラスタ全体で 1 つの名前空間を持つリソース、「Namespace」は Namespace の中に作るリソース。OpenShift 上の全リソースの一覧は 5.4。
 
 - 保管庫側で値を更新すれば、`refreshInterval` ごとの再取得で自動的に Secret へ反映される (検証では 1 分周期)。
 - アプリは Kubernetes 標準の Secret を環境変数 / ボリュームで参照する、**一般的なコンテナアプリと同じ作り方**でよい。ESO 専用の SDK やコードは不要で、アプリは保管庫の存在を意識しない。
@@ -117,7 +120,7 @@ flowchart TB
 flowchart LR
   S1["1. cert-manager<br/>Operator 導入"] --> S2["2. ESO Operator<br/>導入"]
   S2 --> S3["3. ESO 本体の展開<br/>(ExternalSecretsConfig)"]
-  S3 --> S4["4. 保管庫の準備と<br/>認証の設定"]
+  S3 --> S4["4. 保管庫の準備と<br/>認証・通信の設定"]
   S4 --> S5["5. SecretStore 作成<br/>→ 接続確認 (Valid)"]
   S5 --> S6["6. ExternalSecret 作成<br/>→ Secret が自動作成される"]
 ```
@@ -125,7 +128,7 @@ flowchart LR
 | 手順 | 共通 / 環境依存 |
 |---|---|
 | 1〜3 Operator と ESO 本体 | 共通 (ROSA / OCI とも同じ) |
-| 4 保管庫の準備と認証 | **環境依存** (下表) |
+| 4 保管庫の準備と認証・通信の設定 | **環境依存** (下表)。ROSA は ESO の外向き通信を許可する NetworkPolicy の追加が必要 |
 | 5〜6 SecretStore / ExternalSecret | 接続先の記述だけ環境依存 |
 
 ### 5.1 ROSA 版 (保管庫: AWS Secrets Manager)
@@ -142,6 +145,7 @@ flowchart LR
 |---|---|
 | 認証 | ROSA の STS (OIDC)。短期トークンで IAM Role を引き受ける。**アクセスキーをクラスタに置かない** |
 | AWS 側の準備 | Secrets Manager にシークレット作成、IAM Role と読み取りポリシー、Role の信頼ポリシー |
+| OpenShift 側の準備 | ESO の外向き通信 (HTTPS) を許可する NetworkPolicy を `external-secrets` Namespace に追加する。Operator が作る NetworkPolicy (`eso-sys-*`) が外向き通信を止めており、追加しないと SecretStore が通信タイムアウトで Invalid になる |
 | 注意点 | Role の信頼ポリシーの namespace / ServiceAccount 名が、クラスタ上の実際の名前と**完全一致**していること |
 | 検証結果 | 同期 ✔ ([eso-rosa-verification.md](docs/eso-rosa-verification.md)) |
 
@@ -160,6 +164,7 @@ flowchart LR
 |---|---|
 | 認証 | User Principal (API キー)。キーを K8s Secret に保管して SecretStore から参照 (検証用) |
 | OCI 側の準備 | Vault と Master Encryption Key、シークレット、ユーザー/グループ/IAM ポリシー |
+| OpenShift 側の準備 | API キーを入れる Secret。ROSA で必要だった外向き通信の NetworkPolicy は、OCI の検証では追加しなくても接続できた (ESO が外に出られない場合は ROSA と同じ対処をする) |
 | 注意点 | API キーの保管とローテーションが必要 (管理方法の案は 5.2.2)。本番では Workload Identity を検討 (5.2.1)。OCI Vault は Red Hat の動作確認対象の一覧には含まれない (本検証で動作は確認済み) |
 | 検証結果 | 同期 ✔、更新追従 ✔ (`refreshInterval` 1 分後に反映) ([eso-oci-vault-verification.md](docs/eso-oci-vault-verification.md)) |
 
@@ -225,9 +230,58 @@ Workload Identity の検証結果によっては、当面 API キー方式で運
 |---|---|---|---|
 | クラスタに置く鍵 | なし | あり (秘密鍵) | なし (交換用のクライアントシークレットのみ) |
 | 権限の単位 | Namespace / ServiceAccount | API キーのユーザー | Namespace / ServiceAccount |
-| 追加の準備 | IAM Role と信頼設定 | ユーザー / グループ / IAM ポリシー、API キー | 信頼設定、交換用アプリ、IAM ポリシー |
+| 追加の準備 (クラウド側) | IAM Role と信頼設定 | ユーザー / グループ / IAM ポリシー、API キー | 信頼設定、交換用アプリ、IAM ポリシー |
+| 追加の準備 (OpenShift 側) | ServiceAccount、外向き通信の NetworkPolicy | API キーの Secret | ServiceAccount (通信の要否は検証で確認) |
 | 検証状況 | 検証済み | 検証済み | 検証予定 |
 | Red Hat の動作確認対象 | 対象 (バージョン別に要確認) | 一覧に含まれない | 一覧に含まれない |
+
+### 5.4 OpenShift 上で作成するリソースとスコープ
+
+```mermaid
+flowchart TB
+  subgraph CL["クラスタ スコープ"]
+    direction LR
+    ESC["ExternalSecretsConfig<br/>(cluster)"]
+    CSS["ClusterSecretStore<br/>(本番案)"]
+    NSR["Namespace"]
+  end
+  subgraph NS_OP["Namespace: external-secrets-operator / cert-manager-operator"]
+    OP["Operator<br/>(Subscription など)"]
+  end
+  subgraph NS_ESO["Namespace: external-secrets"]
+    ESO["ESO 本体の Pod"]
+    NPS["NetworkPolicy eso-sys-*<br/>(Operator が自動作成)"]
+    NPA["NetworkPolicy 外向き許可<br/>(ROSA で追加)"]
+  end
+  subgraph NS_APP["Namespace: &lt;TARGET_NAMESPACE&gt;"]
+    SA["ServiceAccount"]
+    CRED["Secret: API キー (OCI)"]
+    SS["SecretStore"]
+    ES["ExternalSecret"]
+    SEC["Secret: 同期先"]
+  end
+  OP --> ESO
+  ESC --> ESO
+  ES --> SS
+  ESO -- "作成・更新" --> SEC
+```
+
+| リソース | スコープ | 置く Namespace | 作成 | 環境 | 手順書 |
+|---|---|---|---|---|---|
+| Operator (cert-manager / ESO の Subscription など) | Namespace | `cert-manager-operator` / `external-secrets-operator` | プラットフォーム (OperatorHub) | 共通 | §3.1・3.2 |
+| ExternalSecretsConfig (`cluster`) | クラスタ | — | プラットフォーム | 共通 | §3.3 |
+| ESO 本体の Pod | Namespace | `external-secrets` | 自動 (Operator) | 共通 | §3.3 |
+| NetworkPolicy `eso-sys-*` (通信制限) | Namespace | `external-secrets` | 自動 (Operator)。編集しない | 共通 | ROSA §4.4.1 |
+| NetworkPolicy (外向き通信の許可) | Namespace | `external-secrets` | プラットフォーム | ROSA (OCI の検証では不要) | ROSA §4.4.1 |
+| Namespace | クラスタ | — | プラットフォーム | 共通 | §4 |
+| ServiceAccount | Namespace | `<TARGET_NAMESPACE>` | プラットフォーム | ROSA (OCI は Workload Identity で使用予定) | ROSA §4.4.2 |
+| Secret (API キー) | Namespace | `<TARGET_NAMESPACE>` (本番は 5.2.2 のとおりプラットフォーム専用の Namespace を検討) | プラットフォーム | OCI | OCI §4.3 |
+| SecretStore | Namespace | `<TARGET_NAMESPACE>` | プラットフォーム | 共通 | ROSA §4.4.2 / OCI §4.4 |
+| ClusterSecretStore | クラスタ | — | プラットフォーム | 本番案 (5.2.2)。検証では未使用 | — |
+| ExternalSecret | Namespace | `<TARGET_NAMESPACE>` | アプリ | 共通 | ROSA §4.5 / OCI §4.5 |
+| Secret (同期先) | Namespace | `<TARGET_NAMESPACE>` | 自動 (ESO) | 共通 | 同上 |
+
+`<TARGET_NAMESPACE>` などのプレースホルダは [yaml/README.md](yaml/README.md) を参照。
 
 ## 6. 役割分担 (案)
 
