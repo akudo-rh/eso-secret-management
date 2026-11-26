@@ -24,24 +24,7 @@
 
 **Secret** = パスワード、API キー、証明書、トークンなど、漏えいすると被害が出る値。
 
-```mermaid
-flowchart LR
-  subgraph NG["よくある状態 (課題)"]
-    direction TB
-    A1["ソースコード / Git に平文"]
-    A2["CI の変数・設定ファイルに値が残る"]
-    A3["ローテーションが手作業"]
-    A4["誰が使ったか追えない"]
-  end
-  subgraph OK["目指す状態"]
-    direction TB
-    B1["値の正は専用の保管庫に 1 か所"]
-    B2["アプリには必要な時だけ安全に渡す"]
-    B3["Git には値を置かない"]
-    B4["更新・権限を保管庫側で一元管理"]
-  end
-  NG ==> OK
-```
+![Secret 管理の課題と目指す状態](docs/images/secret-challenges.svg)
 
 ## 2. OpenShift / Kubernetes での Secret 管理の方法
 
@@ -50,42 +33,14 @@ flowchart LR
 | ① 標準 Secret (手動作成) | `oc create secret` で直接登録。簡単だが保管と更新は人手。**base64でエンコードされているだけ（非暗号化）**。 | クラスタ内 |
 | ② **External Secrets Operator (ESO)** | 外部の保管庫の値を、Operator が定期的に Kubernetes の Secret へ同期する | **外部の保管庫** |
 
+![標準 Secret と ESO の比較: 標準 Secret はクラスタ内で手作業管理し base64 エンコードのみ。ESO は外部の保管庫を値の正として自動で同期する](docs/images/secret-management-methods.svg)
+
 
 ## 3. ESO の仕組み
 
 「どこへ・どう接続するか」(SecretStore) と「何を取得するか」(ExternalSecret) を別のリソースに分けて定義する。
 
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'sans-serif', 'lineColor': '#475569'}}}%%
-flowchart LR
-  V[("☁️ 外部の保管庫<br/>AWS Secrets Manager<br/>OCI Vault")]
-
-  subgraph OCP["OpenShift クラスタ"]
-    direction TB
-    subgraph PF["🟦 プラットフォーム管理"]
-      SS["SecretStore<br/>(接続先・認証)"]
-      ESO(["⚙️ ESO<br/>(Operator)"])
-    end
-
-    subgraph APP_NS["🟩 アプリ Namespace"]
-      ES["ExternalSecret<br/>(取得定義)"]
-      SEC["🔑 K8s Secret<br/>(自動生成・更新)"]
-      APP(["🚀 アプリ Pod"])
-    end
-  end
-
-  SS -. "認証設定" .-> ESO
-  ES -. "取得対象" .-> ESO
-  ESO == "① 定期取得 (認証)" ==> V
-  ESO == "② 自動作成・上書き" ==> SEC
-  SEC -- "③ 従来通り参照" --> APP
-
-  style OCP fill:#f8fafc,stroke:#94a3b8,stroke-width:2px
-  style PF fill:#eff6ff,stroke:#93c5fd
-  style APP_NS fill:#f0fdf4,stroke:#86efac
-  style V fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f
-  style SEC fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d
-```
+![ESO の仕組み: SecretStore と ExternalSecret を定義し、ESO が保管庫から取得して Secret を作成・更新する](docs/images/eso-mechanism.svg)
 
 | リソース | スコープ | 役割 | 作る人 |
 |---|---|---|---|
@@ -132,14 +87,7 @@ flowchart LR
 
 詳細手順とエビデンスは下記リポジトリの docs を参照。
 
-```mermaid
-flowchart LR
-  S1["1. cert-manager<br/>Operator 導入"] --> S2["2. ESO Operator<br/>導入"]
-  S2 --> S3["3. ESO 本体の展開<br/>(ExternalSecretsConfig)"]
-  S3 --> S4["4. 保管庫の準備と<br/>認証・通信の設定"]
-  S4 --> S5["5. SecretStore 作成<br/>→ 接続確認 (Valid)"]
-  S5 --> S6["6. ExternalSecret 作成<br/>→ Secret が自動作成される"]
-```
+![導入の流れ: 6 つの手順と、共通・環境依存の区分](docs/images/install-steps.svg)
 
 | 手順 | 共通 / 環境依存 |
 |---|---|
@@ -148,15 +96,7 @@ flowchart LR
 | 5〜6 SecretStore / ExternalSecret | 接続先の記述だけ環境依存 |
 
 ### 5.1 ROSA 版 (保管庫: AWS Secrets Manager)
-```mermaid
-flowchart LR
-  subgraph ROSA["ROSA クラスタ"]
-    ESO["ESO"] -- "ServiceAccount の短期トークン" --> OIDC["クラスタの OIDC"]
-  end
-  OIDC -- "信頼" --> ROLE["AWS IAM Role<br/>(読み取り権限のみ)"]
-  ESO -- "Role を引き受けて取得" --> SM["AWS Secrets Manager"]
-  ROLE -. "許可" .-> SM
-```
+![ROSA 版: STS で認証し AWS Secrets Manager から取得する](docs/images/rosa-auth.svg)
 | 項目 | 内容 |
 |---|---|
 | 認証 | ROSA の STS (OIDC)。短期トークンで IAM Role を引き受ける。**アクセスキーをクラスタに置かない** |
@@ -166,16 +106,7 @@ flowchart LR
 | 検証結果 | 同期 ✔ ([eso-rosa-verification.md](docs/eso-rosa-verification.md)) |
 
 ### 5.2 OCI 版 (保管庫: OCI Vault / OpenShift on OCI)
-```mermaid
-flowchart LR
-  subgraph OCP["OpenShift on OCI"]
-    ESO["ESO"]
-    CRED["認証情報 Secret<br/>(API キー)"]
-    CRED --> ESO
-  end
-  ESO -- "API キーで認証して取得" --> VAULT["OCI Vault"]
-  POL["IAM ポリシー<br/>read secret-family"] -. "許可" .-> VAULT
-```
+![OCI 版 (検証で使用): API キーで認証し OCI Vault から取得する](docs/images/oci-apikey-auth.svg)
 | 項目 | 内容 |
 |---|---|
 | 認証 | User Principal (API キー)。キーを K8s Secret に保管して SecretStore から参照 (検証用) |
@@ -187,15 +118,7 @@ flowchart LR
 #### 5.2.1 本番候補: Workload Identity (確認中)
 OpenShift の ServiceAccount (SA) のトークンを OCI の短期トークンに交換して認証する方式。AWS の STS (ROSA) と同じ考え方で、**SA 単位で権限を分けられる**。2026 年 9 月に OCI が自己管理 Kubernetes 向けの対応を発表した。
 
-```mermaid
-flowchart LR
-  subgraph OCP["OpenShift on OCI"]
-    ESO["ESO"] -- "SA の短期トークン" --> SA["ServiceAccount<br/>(Namespace ごと)"]
-  end
-  SA -- "トークンを交換" --> ID["OCI アイデンティティ・ドメイン<br/>(クラスタを信頼する設定)"]
-  ESO -- "OCI の短期トークンで取得" --> VAULT["OCI Vault"]
-  POL["IAM ポリシー<br/>SA 名で読み取りを許可"] -. "許可" .-> VAULT
-```
+![OCI 版 (本番候補): Workload Identity で認証する](docs/images/oci-workload-identity.svg)
 
 > ESO の OCI 用の Workload 設定は OKE 向けの仕組みを前提にしているため、OpenShift 上の ESO から利用できるかを確認している (7 章 No. 6)。
 > Instance Principal (ノード自身の ID で認証する方式) は、権限がノード単位になり同じノード上のすべての Pod に及ぶため第一候補にはしないが、代替案として評価する (7 章 No. 10)。
@@ -231,34 +154,7 @@ Workload Identity の確認結果によっては、当面 API キー方式で運
 
 ### 5.4 OpenShift 上で作成するリソースとスコープ
 
-```mermaid
-flowchart TB
-  subgraph CL["クラスタ スコープ"]
-    direction LR
-    ESC["ExternalSecretsConfig<br/>(cluster)"]
-    CSS["ClusterSecretStore<br/>(本番案)"]
-    NSR["Namespace"]
-  end
-  subgraph NS_OP["Namespace: external-secrets-operator / cert-manager-operator"]
-    OP["Operator<br/>(Subscription など)"]
-  end
-  subgraph NS_ESO["Namespace: external-secrets"]
-    ESO["ESO 本体の Pod"]
-    NPS["NetworkPolicy eso-sys-*<br/>(Operator が自動作成)"]
-    NPA["NetworkPolicy 外向き許可<br/>(ROSA で追加)"]
-  end
-  subgraph NS_APP["Namespace: &lt;TARGET_NAMESPACE&gt;"]
-    SA["ServiceAccount"]
-    CRED["Secret: API キー (OCI)"]
-    SS["SecretStore"]
-    ES["ExternalSecret"]
-    SEC["Secret: 同期先"]
-  end
-  OP --> ESO
-  ESC --> ESO
-  ES --> SS
-  ESO -- "作成・更新" --> SEC
-```
+![OpenShift 上で作成するリソースとスコープ](docs/images/openshift-resources-scope.svg)
 
 | リソース | スコープ | 置く Namespace | 作成 | 環境 | 手順書 |
 |---|---|---|---|---|---|
@@ -288,34 +184,7 @@ flowchart TB
 
 ### 6.1 作業ごとの担当
 
-```mermaid
-flowchart LR
-  subgraph PF_AREA["プラットフォームチーム担当 (基盤・権限・保管庫)"]
-    direction TB
-    R4["R4. ESO 導入・監視"]
-    R2["R2. 保管庫・IAM 権限設定"]
-    R3["R3. Secret 値の登録・更新"]
-    R5["R5. ServiceAccount /<br/>SecretStore 作成"]
-  end
-
-  subgraph APP_AREA["アプリチーム担当 (Git・アプリ定義)"]
-    direction TB
-    R1["R1. 必要な Secret の洗い出し"]
-    R6["R6. ExternalSecret 作成<br/>(Git 管理)"]
-    R8["R8. アプリで Secret 利用"]
-  end
-
-  R1 -- "申請" --> R2
-  R2 --> R3
-  R2 --> R5
-  R5 -. "利用許可された<br/>接続先を参照" .-> R6
-  R6 -- "CI/CD 自動適用 (R7)" --> R8
-
-  classDef pf fill:#dbeafe,stroke:#1d4ed8,color:#0f172a
-  classDef app fill:#dcfce7,stroke:#15803d,color:#0f172a
-  class R2,R3,R4,R5 pf
-  class R1,R6,R8 app
-```
+![作業ごとの担当 (R1〜R8)](docs/images/roles.svg)
 
 | 項番 | 作業 | プラットフォーム | アプリ |
 |---|---|---|---|
@@ -382,41 +251,7 @@ Allow <誰が> to <何をする> <何に> in compartment <どこで> where <条�
 
 **権限分離の全体図**
 
-```mermaid
-flowchart LR
-  subgraph OCP["OpenShift クラスタ (環境ごと)"]
-    direction TB
-    ESO["ESO"]
-    subgraph NSA["Namespace: アプリ A"]
-      ESA["ExternalSecret"] --> SSA["SecretStore"] --> SAA["ServiceAccount A"]
-      SECA["Secret"]
-    end
-    subgraph NSB["Namespace: アプリ B"]
-      ESB["ExternalSecret"] --> SSB["SecretStore"] --> SAB["ServiceAccount B"]
-    end
-  end
-  subgraph OCI["OCI テナンシ"]
-    direction TB
-    TRUST["信頼設定<br/>(クラスタごと)"]
-    subgraph CENV["コンパートメント: 環境"]
-      direction TB
-      VAULT["Vault + マスター暗号化キー"]
-      SEC_A["シークレット (アプリ A)"]
-      SEC_B["シークレット (アプリ B)"]
-    end
-  end
-  SAA -- "トークン交換" --> TRUST
-  SAB -- "トークン交換" --> TRUST
-  ESO -- "SA A の権限で read" --> SEC_A
-  ESO -- "SA B の権限で read" --> SEC_B
-  ESO -- "同期" --> SECA
-  VAULT -. "暗号化" .-> SEC_A
-  VAULT -. "暗号化" .-> SEC_B
-  classDef pf fill:#dbeafe,stroke:#1d4ed8,color:#0f172a
-  classDef app fill:#dcfce7,stroke:#15803d,color:#0f172a
-  class ESO,SSA,SSB,SAA,SAB,TRUST,VAULT,SEC_A,SEC_B pf
-  class ESA,ESB app
-```
+![権限分離の全体図 (OCI + Workload Identity の案)](docs/images/permission-separation.svg)
 青: プラットフォームチームが管理 / 緑: アプリチームが管理
 
 **境界ごとの分け方**
@@ -448,20 +283,7 @@ flowchart LR
 | 2 | `refreshInterval` 後に Secret へ自動反映 (3.1) | (自動) |
 | 3 | アプリへの反映: 環境変数で参照している場合は Pod の再起動が必要。ボリュームで参照している場合は自動で反映される | アプリ |
 
-```mermaid
-flowchart LR
-  S1["1. Secret 申請<br/>(アプリ)"] --> S2["2. 基盤・IAM 準備<br/>(プラットフォーム)<br/>※初回のみ"]
-  S2 --> S3["3. 保管庫へ値登録<br/>(プラットフォーム)<br/>開発→テスト→本番"]
-  S3 --> S4["4. ExternalSecret 定義<br/>(アプリ / Git登録)"]
-  S4 --> S5["5. デプロイ・自動同期<br/>(CI/CD → ESO)"]
-
-  classDef pf fill:#dbeafe,stroke:#1d4ed8,color:#0f172a
-  classDef app fill:#dcfce7,stroke:#15803d,color:#0f172a
-  classDef auto fill:#f1f5f9,stroke:#64748b,color:#0f172a
-  class S2,S3 pf
-  class S1,S4 app
-  class S5 auto
-```
+![運用フロー: 新しい Secret を追加する](docs/images/operation-flow.svg)
 
 ## 7. 今後の検討事項
 本書の内容のうち、今後決定が必要な事項と、確認を進めている事項をまとめる。

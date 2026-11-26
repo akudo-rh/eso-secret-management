@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 540" width="1200" height="540" font-family="'Noto Sans JP','Noto Sans CJK JP','Hiragino Sans','Hiragino Kaku Gothic ProN','Yu Gothic UI','Meiryo',sans-serif">
+  <defs><marker id="arr-teal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#37a3a3"/></marker><marker id="arr-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b6b6b"/></marker><marker id="arr-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#d10000"/></marker></defs>
+  <rect width="1200" height="540" fill="#ffffff"/>
+  <text x="600.0" y="52" text-anchor="middle" font-size="26" fill="#d10000">ROSA 版：STS で認証し、AWS Secrets Manager から取得</text>
+  <path d="M40,100 H440 V398 Q440,420 418,420 H62 Q40,420 40,398 Z" fill="#ffffff" stroke="#c8c8c8" stroke-width="2"/>
+  <rect x="40" y="100" width="400" height="48" fill="#b3b3b3"/>
+  <text x="240.0" y="130.84" text-anchor="middle" font-size="19" fill="#ffffff">ROSA クラスタ</text>
+  <path d="M640,100 H1160 V398 Q1160,420 1138,420 H662 Q640,420 640,398 Z" fill="#f2f2f2"/>
+  <rect x="640" y="100" width="520" height="48" fill="#b3b3b3"/>
+  <text x="900.0" y="130.84" text-anchor="middle" font-size="19" fill="#ffffff">AWS</text>
+  <rect x="70" y="170" width="340" height="70" rx="8" fill="#37a3a3" stroke="#37a3a3" stroke-width="2"/>
+  <text x="240.0" y="199.0" text-anchor="middle" font-size="19" fill="#ffffff" font-weight="bold">ESO</text>
+  <text x="240.0" y="224.7" text-anchor="middle" font-size="16" fill="#ffffff">SecretStore の設定で動作</text>
+  <rect x="70" y="310" width="340" height="70" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="240.0" y="339.6" text-anchor="middle" font-size="17" fill="#1f7a7a" font-weight="bold">クラスタの OIDC</text>
+  <text x="240.0" y="362.6" text-anchor="middle" font-size="14" fill="#555555">ServiceAccount のトークンを発行</text>
+  <rect x="670" y="170" width="460" height="70" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="3"/>
+  <text x="900.0" y="199.0" text-anchor="middle" font-size="19" fill="#1f7a7a" font-weight="bold">AWS Secrets Manager</text>
+  <text x="900.0" y="224.7" text-anchor="middle" font-size="16" fill="#555555">シークレットの保管</text>
+  <rect x="670" y="310" width="460" height="70" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="900.0" y="339.6" text-anchor="middle" font-size="17" fill="#1f7a7a" font-weight="bold">IAM Role</text>
+  <text x="900.0" y="362.6" text-anchor="middle" font-size="14" fill="#555555">読み取り権限のみ。クラスタの OIDC を信頼</text>
+  <path d="M240,242 L240,307" fill="none" stroke="#37a3a3" stroke-width="2.5" marker-end="url(#arr-teal)"/>
+  <text x="252" y="280.0" text-anchor="start" font-size="14" fill="#1f7a7a">① SA の短期トークン</text>
+  <path d="M412,345 L667,345" fill="none" stroke="#37a3a3" stroke-width="2.5" marker-end="url(#arr-teal)"/>
+  <text x="540" y="313.0" text-anchor="middle" font-size="14" fill="#1f7a7a">② Role を</text>
+  <text x="540" y="331.9" text-anchor="middle" font-size="14" fill="#1f7a7a">引き受ける (STS)</text>
+  <path d="M412,205 L667,205" fill="none" stroke="#37a3a3" stroke-width="3" marker-end="url(#arr-teal)"/>
+  <text x="540" y="192.0" text-anchor="middle" font-size="14" fill="#1f7a7a">③ 値を取得</text>
+  <path d="M900,308 L900,244" fill="none" stroke="#6b6b6b" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arr-gray)"/>
+  <text x="912" y="281.0" text-anchor="start" font-size="14" fill="#555555">許可</text>
+  <rect x="40" y="448" width="1120" height="90" rx="16" fill="#ededed"/>
+  <text x="600.0" y="485" text-anchor="middle" font-size="17" fill="#333333"><tspan fill="#1f7a7a" font-weight="bold">アクセスキーをクラスタに置かない</tspan>。短期トークンで都度認証する。</text>
+  <text x="600.0" y="513" text-anchor="middle" font-size="17" fill="#333333">注意: Role の信頼ポリシーの Namespace / ServiceAccount 名は、クラスタ上の実際の名前と完全一致させる。</text>
+</svg>

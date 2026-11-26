@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" width="1200" height="620" font-family="'Noto Sans JP','Noto Sans CJK JP','Hiragino Sans','Hiragino Kaku Gothic ProN','Yu Gothic UI','Meiryo',sans-serif">
+  <defs><marker id="arr-teal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#37a3a3"/></marker><marker id="arr-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b6b6b"/></marker><marker id="arr-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#d10000"/></marker></defs>
+  <rect width="1200" height="620" fill="#ffffff"/>
+  <text x="600.0" y="52" text-anchor="middle" font-size="26" fill="#d10000">作業ごとの担当 (R1〜R8)</text>
+  <path d="M40,100 H540 V498 Q540,520 518,520 H62 Q40,520 40,498 Z" fill="#ffffff" stroke="#37a3a3" stroke-width="3"/>
+  <rect x="40" y="100" width="500" height="48" fill="#37a3a3"/>
+  <text x="290.0" y="130.48" text-anchor="middle" font-size="18" fill="#ffffff">プラットフォームチーム (基盤・権限・保管庫)</text>
+  <path d="M660,100 H1160 V498 Q1160,520 1138,520 H682 Q660,520 660,498 Z" fill="#f2f2f2"/>
+  <rect x="660" y="100" width="500" height="48" fill="#b3b3b3"/>
+  <text x="910.0" y="130.48" text-anchor="middle" font-size="18" fill="#ffffff">アプリチーム (Git・アプリ定義)</text>
+  <rect x="80" y="175" width="420" height="58" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="290.0" y="210.1" text-anchor="middle" font-size="17" fill="#1f7a7a" font-weight="bold">R2. 保管庫・IAM 権限の設定</text>
+  <rect x="80" y="260" width="420" height="58" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="290.0" y="295.1" text-anchor="middle" font-size="17" fill="#1f7a7a" font-weight="bold">R3. Secret の値の登録・更新</text>
+  <rect x="80" y="345" width="420" height="58" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="290.0" y="380.1" text-anchor="middle" font-size="17" fill="#1f7a7a" font-weight="bold">R5. ServiceAccount / SecretStore の作成</text>
+  <rect x="80" y="430" width="420" height="58" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="290.0" y="465.1" text-anchor="middle" font-size="17" fill="#1f7a7a" font-weight="bold">R4. ESO の導入・監視</text>
+  <rect x="700" y="175" width="420" height="58" rx="8" fill="#ffffff" stroke="#4d4d4d" stroke-width="2"/>
+  <text x="910.0" y="210.1" text-anchor="middle" font-size="17" fill="#333333" font-weight="bold">R1. 必要な Secret の洗い出し</text>
+  <rect x="700" y="345" width="420" height="58" rx="8" fill="#ffffff" stroke="#4d4d4d" stroke-width="2"/>
+  <text x="910.0" y="380.1" text-anchor="middle" font-size="17" fill="#333333" font-weight="bold">R6. ExternalSecret の作成 (Git 管理)</text>
+  <rect x="700" y="430" width="420" height="58" rx="8" fill="#ffffff" stroke="#4d4d4d" stroke-width="2"/>
+  <text x="910.0" y="465.1" text-anchor="middle" font-size="17" fill="#333333" font-weight="bold">R8. アプリで Secret を利用</text>
+  <path d="M698,204 L502,204" fill="none" stroke="#37a3a3" stroke-width="2.5" marker-end="url(#arr-teal)"/>
+  <text x="600" y="194.0" text-anchor="middle" font-size="14" fill="#1f7a7a">申請</text>
+  <path d="M290,233 L290,258" fill="none" stroke="#37a3a3" stroke-width="2.5" marker-end="url(#arr-teal)"/>
+  <path d="M78,204 L60,204 L60,374 L78,374" fill="none" stroke="#37a3a3" stroke-width="2.5" marker-end="url(#arr-teal)"/>
+  <path d="M502,374 L698,374" fill="none" stroke="#37a3a3" stroke-width="2.5" marker-end="url(#arr-teal)"/>
+  <text x="600" y="364.0" text-anchor="middle" font-size="14" fill="#1f7a7a">参照先を提供</text>
+  <path d="M910,403 L910,428" fill="none" stroke="#37a3a3" stroke-width="2.5" marker-end="url(#arr-teal)"/>
+  <text x="922" y="421" text-anchor="start" font-size="14" fill="#1f7a7a">CI/CD で適用 (R7)</text>
+  <rect x="40" y="546" width="1120" height="44" rx="16" fill="#ededed"/>
+  <text x="600.0" y="574" text-anchor="middle" font-size="17" fill="#333333">ExternalSecret (R6) はアプリチームだけで作成できる。取得できる範囲は <tspan fill="#1f7a7a" font-weight="bold">R2・R5 で先に決まっている</tspan> ため、個別の確認は不要。</text>
+</svg>
