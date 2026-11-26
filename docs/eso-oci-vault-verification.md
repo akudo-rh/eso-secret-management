@@ -370,10 +370,10 @@ README 5.2・5.3 のとおり、OpenShift on OCI では認証方式が論点に�
 | 方式 | 位置づけ (README) | 特徴 | 課題 |
 |---|---|---|---|
 | User Principal (API キー) ← 本書の構成 | 検証で使用。当面の運用候補 (5.2.2) | 手軽 | 秘密鍵の保管とローテーションが必要。管理案は README 5.2.2 |
-| Workload Identity | 本番候補 (5.2.1)。検証予定 | ServiceAccount 単位で権限を分けられる (AWS の STS と同じ考え方) | ESO の OCI 用の Workload 設定は OKE 向けの仕組みを前提にしているため、OpenShift で使えるかを検証する |
-| Instance Principal | Workload Identity が使えない場合の代替 (README 7 章 No. 10) | 鍵の管理が不要 | 権限がノード単位になる。対策とあわせて検討 |
+| Workload Identity | 確認中 (5.2.1) | ServiceAccount 単位で権限を分けられる (AWS の STS と同じ考え方) | ESO の OCI 用の Workload 設定は OKE 向けの仕組みを前提にしているため、OpenShift で使えるかを検証する |
+| Instance Principal | Workload Identity が使えない場合の代替 ([検討事項](oci-permission-considerations.md) No. 7) | 鍵の管理が不要 | 権限がノード単位になる。対策とあわせて検討 |
 
-加えて、キー・IAM の管理者を責任分界で明確にする点も整理が必要 (README 6 章)。今後の検討事項の一覧は README 7 章。
+加えて、キー・IAM の管理者を責任分界で明確にする点も整理が必要 (README 6 章)。権限・認証の検討事項は [oci-permission-considerations.md](oci-permission-considerations.md)。
 
 ## 7. 後片付け
 
