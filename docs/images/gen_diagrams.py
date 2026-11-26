@@ -108,18 +108,20 @@ class SVG:
 
 # 1 章
 def d_challenges(out):
-    s = SVG(80, 450)
-    s.panel(40, 100, 500, 330, "よくある状態 (課題)", "gray")
-    for i, t in enumerate(["ソースコード / Git に平文", "CI の変数・設定ファイルに値が残る", "ローテーションが手作業", "誰が使ったか追えない"]):
-        y = 170 + i * 62
-        s.box(80, y, 420, 50, t, "plain")
-        s.text(102, y + 32, "×", F_MAIN, RED, True)
-    s.big_arrow(560, 265)
-    s.panel(660, 100, 500, 330, "目指す状態", "teal")
-    for i, t in enumerate(["値は専用の保管庫 1 か所で管理", "アプリには必要な時だけ安全に渡す", "Git には値を置かない", "更新・権限を保管庫側で一元管理"]):
-        y = 170 + i * 62
-        s.box(700, y, 420, 50, t, "pf")
-        s.text(722, y + 32, "✓", F_MAIN, TEAL_D, True)
+    s = SVG(80, 400)
+    s.panel(40, 100, 500, 280, "よくある状態 (課題)", "gray")
+    left = [["拡散する", "値のコピーがあちこちにある"], ["追えない", "誰が見た・使ったか記録がない"], ["変えられない", "変更は置き場所すべてに手作業"]]
+    right = [["1 か所で管理", "値は保管庫だけに置く"], ["記録・統制できる", "アクセスを保管庫で管理"], ["1 か所の変更で反映", "残りは自動で同期"]]
+    for i, l in enumerate(left):
+        y = 166 + i * 70
+        s.box(80, y, 420, 58, l, "plain")
+        s.text(104, y + 36, "×", F_MAIN, RED, True)
+    s.big_arrow(560, 240)
+    s.panel(660, 100, 500, 280, "目指す状態 (ESO)", "teal")
+    for i, r in enumerate(right):
+        y = 166 + i * 70
+        s.box(700, y, 420, 58, r, "pf")
+        s.text(724, y + 36, "✓", F_MAIN, TEAL_D, True)
     s.save(out / "secret-challenges.svg")
 
 
@@ -294,24 +296,6 @@ def d_scope(out):
     s.save(out / "openshift-resources-scope.svg")
 
 
-def d_roles(out):
-    s = SVG(80, 540)
-    s.panel(40, 100, 500, 420, "プラットフォームチーム", "teal")
-    s.panel(660, 100, 500, 420, "アプリチーム", "gray")
-    for (n, t), y in zip([("R2", "保管庫・IAM 権限の設定"), ("R3", "Secret の値の登録・更新"),
-                          ("R5", "ServiceAccount / SecretStore 作成"), ("R4", "ESO の導入・監視")], [172, 258, 344, 430]):
-        s.box(80, y, 420, 60, f"{n}. {t}", "pf")
-    for n, t, y in [("R1", "必要な Secret の洗い出し", 172), ("R6", "ExternalSecret の作成 (Git)", 344), ("R8", "アプリで Secret を利用", 430)]:
-        s.box(700, y, 420, 60, f"{n}. {t}", "app")
-    s.arrow([(698, 202), (502, 202)], TEAL, 2.5, label="申請", lx=600, ly=190)
-    s.arrow([(290, 234), (290, 255)], TEAL, 2.5)
-    s.arrow([(78, 202), (60, 202), (60, 374), (78, 374)], TEAL, 2.5)
-    s.arrow([(502, 374), (698, 374)], TEAL, 2.5, label="参照先を提供", lx=600, ly=362)
-    s.arrow([(910, 406), (910, 427)], TEAL, 2.5)
-    s.text(924, 422, "CI/CD で適用 (R7)", F_LABEL, TEAL_D, anchor="start")
-    s.save(out / "roles.svg")
-
-
 def d_permissions(out):
     s = SVG(70, 600)
     s.legend(300, 92)
@@ -340,26 +324,10 @@ def d_permissions(out):
     s.save(out / "permission-separation.svg")
 
 
-def d_flow(out):
-    s = SVG(70, 270)
-    s.legend(300, 92)
-    steps = [(["Secret を申請", "R1"], "app"), (["基盤・IAM の準備", "初回のみ (R2・R5)"], "pf"),
-             (["保管庫に値を登録", "開発→本番の順 (R3)"], "pf"), (["ExternalSecret", "を Git に登録 (R6)"], "app"),
-             (["デプロイ・同期", "CI/CD → ESO"], "auto")]
-    w, gap = 206, 22
-    for i, (t, st) in enumerate(steps):
-        x = 40 + i * (w + gap)
-        s.box(x, 140, w, 100, t, st)
-        s.badge(x + w / 2, 140, str(i + 1))
-        if i < 4:
-            s.arrow([(x + w + 2, 190), (x + w + gap - 2, 190)], TEAL, 2.5)
-    s.save(out / "operation-flow.svg")
-
-
 if __name__ == "__main__":
     out = Path(sys.argv[1])
     out.mkdir(parents=True, exist_ok=True)
     for f in (d_challenges, d_methods, d_eso_mechanism, d_install_steps, d_rosa, d_oci_apikey, d_apikey_lifecycle, d_oci_wi,
-              d_scope, d_roles, d_permissions, d_flow):
+              d_scope, d_permissions,):
         f(out)
     print("generated")
