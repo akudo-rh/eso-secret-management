@@ -50,15 +50,6 @@ flowchart LR
 | ① 標準 Secret (手動作成) | `oc create secret` で直接登録。簡単だが保管と更新は人手。**base64でエンコードされているだけ（非暗号化）**。 | クラスタ内 |
 | ② **External Secrets Operator (ESO)** | 外部の保管庫の値を、Operator が定期的に Kubernetes の Secret へ同期する | **外部の保管庫** |
 
-```mermaid
-flowchart LR
-  subgraph M1["① 標準 Secret"]
-    P1["担当者"] -- "oc create secret" --> S1["Secret"]
-  end
-  subgraph M3["② ESO"]
-    V3["外部の保管庫"] -- "定期的に同期" --> S3["Secret"]
-  end
-```
 
 ## 3. ESO の仕組み
 
@@ -117,29 +108,6 @@ flowchart LR
 | `0` を指定した場合 | 最初の 1 回だけ取得し、以降は更新しない |
 | 既定値 | CRD の既定は `1h`。Red Hat ドキュメントの例も `1h` |
 | 目安 | 既定の `1h` を基本とし、ローテーションの反映を急ぐ Secret だけ短くする |
-
-```mermaid
-sequenceDiagram
-  autonumber
-  participant PF as プラットフォーム担当
-  participant Vault as 外部の保管庫
-  participant ESO as ESO (Operator)
-  participant Sec as K8s Secret
-  participant App as アプリ (Pod)
-
-  PF->>Vault: 新しい Secret 値を登録
-  Note over ESO,Vault: refreshInterval ごとに定期確認 (既定: 1h)
-  ESO->>Vault: 最新の値を取得
-  Vault-->>ESO: 新しい値を返却
-  ESO->>Sec: Secret を自動更新
-  alt ボリュームマウントで参照
-    Sec-->>App: 数十秒〜1分程度で自動反映 (再起動不要)
-  else 環境変数で参照
-    Note over App: 起動時の値のまま維持される
-    PF->>App: Pod を再起動 (Rollout Restart)
-    Sec-->>App: 新しい環境変数を読み込み
-  end
-```
 
 ## 4. 方式の比較 (メリット・デメリット)
 
