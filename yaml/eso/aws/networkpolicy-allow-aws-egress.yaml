@@ -1,7 +1,7 @@
 # ESO Operator (Red Hat) は external-secrets namespace に deny-all + API/DNS のみ許可の
 # NetworkPolicy (eso-sys-*) を作る。そのままでは AWS (STS / Secrets Manager) に出られない。
 # eso-sys-* は Operator 管理のため編集せず、別名のポリシーで HTTPS egress を許可する。
-# 適用: oc apply -f yaml/eso/aws/networkpolicy-allow-aws-egress.yaml
+# 適用: oc apply -f yaml/eso/aws/networkpolicy-allow-aws-egress.yaml (置き換え不要。external-secrets は Operator が作る固定の Namespace)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

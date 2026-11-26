@@ -4,13 +4,13 @@
     {
       "Effect": "Allow",
       "Principal": {
-        "Federated": "arn:aws:iam::<アカウントID>:oidc-provider/<OIDC ホストパス>"
+        "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/<OIDC_HOST_PATH>"
       },
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
         "StringEquals": {
-          "<OIDC ホストパス>:sub": "system:serviceaccount:<Namespace 名>:<ServiceAccount 名>",
-          "<OIDC ホストパス>:aud": "sts.amazonaws.com"
+          "<OIDC_HOST_PATH>:sub": "system:serviceaccount:<TARGET_NAMESPACE>:<SERVICE_ACCOUNT>",
+          "<OIDC_HOST_PATH>:aud": "sts.amazonaws.com"
         }
       }
     }

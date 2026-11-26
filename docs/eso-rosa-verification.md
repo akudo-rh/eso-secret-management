@@ -4,7 +4,8 @@ ROSA クラスタに External Secrets Operator (ESO) を導入し、Secret が�
 **ROSA と AWS だけで完結**する構成 (外部ストアは AWS Secrets Manager、認証は ROSA の STS / OIDC)。
 
 - 検証に使う YAML → [yaml/eso/aws/](../yaml/eso/aws/)、[yaml/aws-iam/](../yaml/aws-iam/)
-- YAML / JSON 内の `<...>` は、§2.2 で確認した自分の環境の値に置き換えてから使う。
+- YAML / JSON 内の `<...>` は、§2.2 で確認した自分の環境の値に置き換えてから使う。プレースホルダの一覧は [yaml/README.md](../yaml/README.md)。 作成する OpenShift リソースのスコープ (クラスタ / Namespace) は [README 5.4](../README.md#54-openshift-上で作成するリソースとスコープ) を参照。
+- コマンドの `<TARGET_NAMESPACE>` などは YAML と同じプレースホルダ。本書の検証では `eso-test` を使った。
 
 ## 0. 検証開始前に確定させる項目 (ヒアリング・確認事項)
 
@@ -66,27 +67,28 @@ Kubernetes Secret (key: password)
 
 | 情報 | 使う場所 | 確認方法 |
 |---|---|---|
-| `<クラスタ名>` | `rosa` コマンド | `rosa list clusters` / OCM コンソール (https://console.redhat.com/openshift) のクラスタ一覧 |
-| ROSA 種別 (Classic / HCP)、OCP バージョン | 手順の分岐 | `rosa describe cluster -c <クラスタ名>` の `Type` / `OpenShift Version` / OCM コンソールのクラスタ詳細 |
-| `<API URL>` | `oc login` | `rosa describe cluster -c <クラスタ名>` の `API URL` |
-| `<Console URL>` | Operator のインストール (Web コンソール) | `rosa describe cluster -c <クラスタ名>` の `Console URL` |
-| `<リージョン>` (例: `ap-northeast-1`) | SecretStore の `region`、AWS コマンド、§2.4 の通信確認 | `rosa describe cluster -c <クラスタ名>` の `Region` / AWS コンソール右上のリージョン表示 |
-| `<アカウントID>` (12 桁) | IAM Role / Policy の ARN | `aws sts get-caller-identity --query Account --output text` / AWS コンソール右上のアカウントメニュー |
-| `<OIDC ホストパス>` (`https://` を除いた OIDC URL) | IAM Role の信頼ポリシー | `rosa describe cluster -c <クラスタ名>` の `OIDC Endpoint URL` から `https://` を除く。IAM コンソール →「ID プロバイダ」に同じ値のプロバイダがあること (`aws iam list-open-id-connect-providers`) |
-| `<シークレット名>` (例: `rosa-demo/password`) | ExternalSecret の `remoteRef.key` | 自分で決める。作成後は AWS コンソール → Secrets Manager の一覧 / `aws secretsmanager list-secrets --region <リージョン>` |
-| `<シークレット ARN>` | 権限ポリシーの `Resource` | `aws secretsmanager describe-secret --region <リージョン> --secret-id <シークレット名> --query ARN --output text` / コンソールのシークレット詳細画面 (末尾にランダムな 6 文字が付く) |
-| `<Namespace 名>` (本書は `eso-test`)、`<ServiceAccount 名>` (本書は `eso-aws-sa`) | 信頼ポリシーの `sub`、ServiceAccount、SecretStore | 自分で決める。**信頼ポリシーの `sub` (`system:serviceaccount:<Namespace 名>:<ServiceAccount 名>`) と、クラスタ上の実際の名前が 1 文字でも違うと認証に失敗する** (`oc get sa -n <Namespace 名>` で確認) |
-| `<Role ARN>` | ServiceAccount の注釈 | Role を管理者に作ってもらった場合は返ってきた ARN / `aws iam get-role --role-name <Role 名> --query Role.Arn --output text` / IAM コンソール →「ロール」の詳細 |
+| `<CLUSTER_NAME>` | `rosa` コマンド | `rosa list clusters` / OCM コンソール (https://console.redhat.com/openshift) のクラスタ一覧 |
+| ROSA 種別 (Classic / HCP)、OCP バージョン | 手順の分岐 | `rosa describe cluster -c <CLUSTER_NAME>` の `Type` / `OpenShift Version` / OCM コンソールのクラスタ詳細 |
+| `<API_URL>` | `oc login` | `rosa describe cluster -c <CLUSTER_NAME>` の `API URL` |
+| `<CONSOLE_URL>` | Operator のインストール (Web コンソール) | `rosa describe cluster -c <CLUSTER_NAME>` の `Console URL` |
+| `<REGION>` (例: `ap-northeast-1`) | SecretStore の `region`、AWS コマンド、§2.4 の通信確認 | `rosa describe cluster -c <CLUSTER_NAME>` の `Region` / AWS コンソール右上のリージョン表示 |
+| `<ACCOUNT_ID>` (12 桁) | IAM Role / Policy の ARN | `aws sts get-caller-identity --query Account --output text` / AWS コンソール右上のアカウントメニュー |
+| `<OIDC_HOST_PATH>` (`https://` を除いた OIDC URL) | IAM Role の信頼ポリシー | `rosa describe cluster -c <CLUSTER_NAME>` の `OIDC Endpoint URL` から `https://` を除く。IAM コンソール →「ID プロバイダ」に同じ値のプロバイダがあること (`aws iam list-open-id-connect-providers`) |
+| `<REMOTE_SECRET_NAME>` (例: `rosa-demo/password`) | ExternalSecret の `remoteRef.key` | 自分で決める。作成後は AWS コンソール → Secrets Manager の一覧 / `aws secretsmanager list-secrets --region <REGION>` |
+| `<SECRET_ARN>` | 権限ポリシーの `Resource` | `aws secretsmanager describe-secret --region <REGION> --secret-id <REMOTE_SECRET_NAME> --query ARN --output text` / コンソールのシークレット詳細画面 (末尾にランダムな 6 文字が付く) |
+| `<TARGET_NAMESPACE>` (本書は `eso-test`)、`<SERVICE_ACCOUNT>` (本書は `eso-aws-sa`) | 信頼ポリシーの `sub`、ServiceAccount、SecretStore | 自分で決める。**信頼ポリシーの `sub` (`system:serviceaccount:<TARGET_NAMESPACE>:<SERVICE_ACCOUNT>`) と、クラスタ上の実際の名前が 1 文字でも違うと認証に失敗する** (`oc get sa -n <TARGET_NAMESPACE>` で確認) |
+| `<SECRET_STORE>` (本書は `aws-sm`)、`<TARGET_SECRET>` (本書は `demo-secret-aws`)、`<SECRET_KEY>` (本書は `password`) | SecretStore、ExternalSecret | 自分で決める ([yaml/README.md](../yaml/README.md)) |
+| `<ROLE_ARN>` | ServiceAccount の注釈 | Role を管理者に作ってもらった場合は返ってきた ARN / `aws iam get-role --role-name <ROLE_NAME> --query Role.Arn --output text` / IAM コンソール →「ロール」の詳細 |
 
 ### 2.3 ROSA へのログイン
 ```bash
 rosa login --token=<OCM token>              # トークンは https://console.redhat.com/openshift/token で取得
-rosa describe cluster -c <クラスタ名>        # State=ready を確認
+rosa describe cluster -c <CLUSTER_NAME>        # State=ready を確認
 ```
 IdP が無く管理者が必要な場合 (検証用。終了後に削除):
 ```bash
-rosa create admin -c <クラスタ名>            # 表示される oc login コマンドを実行 (反映まで数分)
-oc login <API URL> --username cluster-admin --password <表示されたPW>
+rosa create admin -c <CLUSTER_NAME>            # 表示される oc login コマンドを実行 (反映まで数分)
+oc login <API_URL> --username cluster-admin --password <表示されたPW>
 ```
 確認:
 ```bash
@@ -101,8 +103,8 @@ Pod から AWS の STS / Secrets Manager に出られること。ROSA は通常 
 ```bash
 oc run curl -n default --image=registry.access.redhat.com/ubi9/ubi-minimal --restart=Never --command -- sleep 300
 oc wait -n default --for=condition=Ready pod/curl --timeout=120s
-oc exec -n default curl -- curl -sS -o /dev/null -w '%{http_code}\n' --max-time 10 https://sts.<リージョン>.amazonaws.com
-oc exec -n default curl -- curl -sS -o /dev/null -w '%{http_code}\n' --max-time 10 https://secretsmanager.<リージョン>.amazonaws.com
+oc exec -n default curl -- curl -sS -o /dev/null -w '%{http_code}\n' --max-time 10 https://sts.<REGION>.amazonaws.com
+oc exec -n default curl -- curl -sS -o /dev/null -w '%{http_code}\n' --max-time 10 https://secretsmanager.<REGION>.amazonaws.com
 oc delete pod curl -n default
 ```
 HTTP コードが返れば (302 / 400 / 403 / 404 でも) 到達 OK。タイムアウトは egress 制限。
@@ -112,7 +114,7 @@ HTTP コードが返れば (302 / 400 / 403 / 404 でも) 到達 OK。タイム�
 
 ### 3.1 cert-manager Operator
 
-1. ROSA の Web コンソール (`<Console URL>`) → OperatorHub から **cert-manager Operator for Red Hat OpenShift** をインストール
+1. ROSA の Web コンソール (`<CONSOLE_URL>`) → OperatorHub から **cert-manager Operator for Red Hat OpenShift** をインストール
    - チャネル: `stable-v1.20` / バージョン: 1.20.1 / 更新の承認: 手動 / その他デフォルト
    - **ROSA (STS クラスタ) では「Role ARN」欄が表示される。** cert-manager が AWS (Route53 の DNS-01 など) を操作するための IAM Role を指定する欄。
      ESO の用途では cert-manager は webhook 用の内部証明書発行にしか使わず AWS 権限は不要なので、**本検証では実質使われない**。
@@ -165,7 +167,7 @@ oc get crd | grep external-secrets.io
 ## 4. 検証
 
 ```bash
-oc new-project eso-test
+oc new-project <TARGET_NAMESPACE>
 ```
 
 ### 4.1 ① fake ストアで ESO の動作を確認
@@ -177,7 +179,7 @@ apiVersion: external-secrets.io/v1
 kind: SecretStore
 metadata:
   name: fake-store
-  namespace: eso-test
+  namespace: <TARGET_NAMESPACE>
 spec:
   provider:
     fake:
@@ -186,7 +188,7 @@ spec:
           value: "P@ssw0rd-from-fake"
 EOF
 
-oc get secretstore -n eso-test
+oc get secretstore -n <TARGET_NAMESPACE>
 ```
 想定:
 ```
@@ -199,7 +201,7 @@ apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
   name: demo-secret-fake
-  namespace: eso-test
+  namespace: <TARGET_NAMESPACE>
 spec:
   refreshInterval: 1m
   secretStoreRef:
@@ -214,19 +216,19 @@ spec:
         key: /demo/password
 EOF
 
-oc get externalsecret demo-secret-fake -n eso-test       # STATUS=SecretSynced / READY=True になるまで待つ
-oc get secret demo-secret-fake -n eso-test -o jsonpath='{.data.password}' | base64 -d; echo
+oc get externalsecret demo-secret-fake -n <TARGET_NAMESPACE>       # STATUS=SecretSynced / READY=True になるまで待つ
+oc get secret demo-secret-fake -n <TARGET_NAMESPACE> -o jsonpath='{.data.password}' | base64 -d; echo
 ```
 **`demo-secret-fake` (K8s Secret) は自分で作るものではなく、ExternalSecret を適用すると ESO が自動で作成する。**
 そのため、ExternalSecret の適用前や、同期が完了する前に `oc get secret demo-secret-fake` を実行すると `NotFound` になる。
 必ず先に ExternalSecret が `SecretSynced` / `Ready=True` になったことを確認してから Secret を取得する (待つ場合は下記)。
 ```bash
-oc wait --for=condition=Ready externalsecret/demo-secret-fake -n eso-test --timeout=60s
+oc wait --for=condition=Ready externalsecret/demo-secret-fake -n <TARGET_NAMESPACE> --timeout=60s
 ```
 Ready にならない / Secret ができない場合:
 ```bash
-oc describe externalsecret demo-secret-fake -n eso-test    # Events / Conditions のエラーを確認
-oc get secretstore fake-store -n eso-test                  # Valid / READY=True か
+oc describe externalsecret demo-secret-fake -n <TARGET_NAMESPACE>    # Events / Conditions のエラーを確認
+oc get secretstore fake-store -n <TARGET_NAMESPACE>                  # Valid / READY=True か
 oc logs -n external-secrets deploy/external-secrets --tail=50
 ```
 想定: `SecretSynced` / `Ready=True`、値は `P@ssw0rd-from-fake`。
@@ -237,27 +239,27 @@ oc logs -n external-secrets deploy/external-secrets --tail=50
 ### 4.2 ② AWS Secrets Manager にシークレットを作成
 AWS CLI で作成する場合:
 ```bash
-aws secretsmanager create-secret --region <リージョン> \
-  --name <シークレット名> --secret-string 'P@ssw0rd-from-aws'
+aws secretsmanager create-secret --region <REGION> \
+  --name <REMOTE_SECRET_NAME> --secret-string 'P@ssw0rd-from-aws'
 
-aws secretsmanager describe-secret --region <リージョン> \
-  --secret-id <シークレット名> --query ARN --output text      # <シークレット ARN> を控える
+aws secretsmanager describe-secret --region <REGION> \
+  --secret-id <REMOTE_SECRET_NAME> --query ARN --output text      # <SECRET_ARN> を控える
 ```
 
 #### コンソールで作成する場合 (AWS CLI が使えない端末向け)
-1. AWS マネジメントコンソールにサインイン → 右上のリージョンを **ROSA クラスタと同じリージョン** (`<リージョン>`) に切り替える
+1. AWS マネジメントコンソールにサインイン → 右上のリージョンを **ROSA クラスタと同じリージョン** (`<REGION>`) に切り替える
 2. **Secrets Manager** → 「新しいシークレットを保存する」
 3. シークレットのタイプ: **その他のシークレットのタイプ**
 4. 「キー/値」ではなく **「プレーンテキスト」タブ** を選び、既定の JSON を消して `P@ssw0rd-from-aws` だけを入力
    - ※ キー/値で作ると値が JSON (`{"password":"..."}`) になり、ESO が取得する値もその JSON 文字列になる。`remoteRef` に `property` 指定が必要になるため、今回はプレーンテキストにする
 5. 暗号化キー: 既定の `aws/secretsmanager` のまま → 次へ
-6. シークレット名: `<シークレット名>` (例: `rosa-demo/password`) → 次へ (ローテーション: 無効のまま) → 保存
+6. シークレット名: `<REMOTE_SECRET_NAME>` (例: `rosa-demo/password`) → 次へ (ローテーション: 無効のまま) → 保存
 7. 作成後、シークレットの詳細画面で **シークレットの ARN** を控える (例: `arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:rosa-demo/password-AbCdEf`)
    - 権限ポリシー (§4.3) の `Resource` には **この完全な ARN** を使う
 
 ### 4.3 IAM Role の作成 (ROSA の OIDC を信頼)
-ESO が使う ServiceAccount (`<Namespace 名>/<ServiceAccount 名>`) だけがこの Role を引き受けられるようにする。アクセスキーは作らない。
-IAM の作成権限が無い場合は、管理者に作成を依頼する ([request-to-admin-rosa.md](request-to-admin-rosa.md))。依頼時は下の 2 つの JSON と、返してほしい値 (`<Role ARN>`) を伝える。
+ESO が使う ServiceAccount (`<TARGET_NAMESPACE>/<SERVICE_ACCOUNT>`) だけがこの Role を引き受けられるようにする。アクセスキーは作らない。
+IAM の作成権限が無い場合は、管理者に作成を依頼する ([request-to-admin-rosa.md](request-to-admin-rosa.md))。依頼時は下の 2 つの JSON と、返してほしい値 (`<ROLE_ARN>`) を伝える。
 
 **① 権限ポリシー** (`rosa-eso-demo-read`): 対象シークレット 1 件の参照のみ ([yaml/aws-iam/read-secret-policy.json](../yaml/aws-iam/read-secret-policy.json))
 ```json
@@ -267,7 +269,7 @@ IAM の作成権限が無い場合は、管理者に作成を依頼する ([requ
     {
       "Effect": "Allow",
       "Action": ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"],
-      "Resource": "<シークレット ARN>"
+      "Resource": "<SECRET_ARN>"
     }
   ]
 }
@@ -281,20 +283,20 @@ IAM の作成権限が無い場合は、管理者に作成を依頼する ([requ
     {
       "Effect": "Allow",
       "Principal": {
-        "Federated": "arn:aws:iam::<アカウントID>:oidc-provider/<OIDC ホストパス>"
+        "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/<OIDC_HOST_PATH>"
       },
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
         "StringEquals": {
-          "<OIDC ホストパス>:sub": "system:serviceaccount:<Namespace 名>:<ServiceAccount 名>",
-          "<OIDC ホストパス>:aud": "sts.amazonaws.com"
+          "<OIDC_HOST_PATH>:sub": "system:serviceaccount:<TARGET_NAMESPACE>:<SERVICE_ACCOUNT>",
+          "<OIDC_HOST_PATH>:aud": "sts.amazonaws.com"
         }
       }
     }
   ]
 }
 ```
-- `<OIDC ホストパス>` は `https://` なし・末尾 `/` なし。
+- `<OIDC_HOST_PATH>` は `https://` なし・末尾 `/` なし。
 - `sub` の Namespace 名と ServiceAccount 名は、§4.4 で作るものと**完全一致**させる。
 
 AWS CLI で作成する場合 (①②を `read-secret.json` / `trust.json` に保存して):
@@ -302,7 +304,7 @@ AWS CLI で作成する場合 (①②を `read-secret.json` / `trust.json` に�
 aws iam create-policy --policy-name rosa-eso-demo-read --policy-document file://read-secret.json
 aws iam create-role   --role-name   rosa-eso-demo      --assume-role-policy-document file://trust.json
 aws iam attach-role-policy --role-name rosa-eso-demo \
-  --policy-arn arn:aws:iam::<アカウントID>:policy/rosa-eso-demo-read
+  --policy-arn arn:aws:iam::<ACCOUNT_ID>:policy/rosa-eso-demo-read
 ```
 コンソールの場合: IAM →「ポリシー」で ① を作成 →「ロール」→「ロールを作成」→ カスタム信頼ポリシーに ② を貼る → ① をアタッチ。
 
@@ -312,7 +314,7 @@ aws iam attach-role-policy --role-name rosa-eso-demo \
 Red Hat 版 ESO の Operator は、`external-secrets` Namespace に「全通信を拒否し、API サーバーと DNS だけ許可する」NetworkPolicy (`eso-sys-*`) を自動で作成する。そのままでは ESO の Pod は AWS (STS / Secrets Manager) に出られず、SecretStore が次のエラーで Invalid になる。
 
 ```
-STS: AssumeRoleWithWebIdentity ... Post "https://sts.<リージョン>.amazonaws.com/": dial tcp ...: i/o timeout
+STS: AssumeRoleWithWebIdentity ... Post "https://sts.<REGION>.amazonaws.com/": dial tcp ...: i/o timeout
 ```
 (§2.4 のように、別の Namespace の普通の Pod からは到達できても、ESO の Pod だけが届かない。)
 
@@ -324,11 +326,11 @@ oc apply -f yaml/eso/aws/networkpolicy-allow-aws-egress.yaml
 - 宛先は検証用に限定していない (AWS の IP は可変で、NetworkPolicy では FQDN を指定できないため)。本番では VPC エンドポイント経由にする、または宛先 FQDN で制限できる仕組みを検討する。
 
 #### 4.4.2 ServiceAccount と SecretStore
-[yaml/eso/aws/serviceaccount.yaml](../yaml/eso/aws/serviceaccount.yaml) の `<Role ARN>`、[yaml/eso/aws/secretstore.yaml](../yaml/eso/aws/secretstore.yaml) の `<リージョン>` を置き換えて適用する。
+[yaml/eso/aws/serviceaccount.yaml](../yaml/eso/aws/serviceaccount.yaml) と [yaml/eso/aws/secretstore.yaml](../yaml/eso/aws/secretstore.yaml) の `<...>` (`<TARGET_NAMESPACE>`、`<SERVICE_ACCOUNT>`、`<ROLE_ARN>`、`<SECRET_STORE>`、`<REGION>`) を置き換えて適用する。
 ```bash
 oc apply -f yaml/eso/aws/serviceaccount.yaml
 oc apply -f yaml/eso/aws/secretstore.yaml
-oc get secretstore aws-sm -n eso-test
+oc get secretstore <SECRET_STORE> -n <TARGET_NAMESPACE>
 ```
 想定:
 ```
@@ -338,21 +340,21 @@ aws-sm   10s   Valid    ReadWrite      True
 `Valid` にならない場合は §5 を参照。
 
 ### 4.5 ExternalSecret による同期の確認
-[yaml/eso/aws/externalsecret.yaml](../yaml/eso/aws/externalsecret.yaml) の `<シークレット名>` を置き換えて適用する。
+[yaml/eso/aws/externalsecret.yaml](../yaml/eso/aws/externalsecret.yaml) の `<...>` (`<TARGET_SECRET>`、`<SECRET_KEY>`、`<REMOTE_SECRET_NAME>` など) を置き換えて適用する。本書の検証では `<TARGET_SECRET>` = `demo-secret-aws`、`<SECRET_KEY>` = `password`。
 ```bash
 oc apply -f yaml/eso/aws/externalsecret.yaml
-oc get externalsecret demo-secret-aws -n eso-test
-oc get secret demo-secret-aws -n eso-test -o jsonpath='{.data.password}' | base64 -d; echo
+oc get externalsecret <TARGET_SECRET> -n <TARGET_NAMESPACE>
+oc get secret <TARGET_SECRET> -n <TARGET_NAMESPACE> -o jsonpath='{.data.password}' | base64 -d; echo
 ```
 期待する結果: `SecretSynced` / `Ready=True`、`P@ssw0rd-from-aws` が取得できる。
 
 ### 4.6 更新追従の確認
 ```bash
-aws secretsmanager put-secret-value --region <リージョン> \
-  --secret-id <シークレット名> --secret-string 'P@ssw0rd-from-aws-v2'
+aws secretsmanager put-secret-value --region <REGION> \
+  --secret-id <REMOTE_SECRET_NAME> --secret-string 'P@ssw0rd-from-aws-v2'
 sleep 90
-oc get externalsecret -n eso-test
-oc get secret demo-secret-aws -n eso-test -o jsonpath='{.data.password}' | base64 -d; echo
+oc get externalsecret -n <TARGET_NAMESPACE>
+oc get secret <TARGET_SECRET> -n <TARGET_NAMESPACE> -o jsonpath='{.data.password}' | base64 -d; echo
 ```
 (コンソールの場合: Secrets Manager → シークレット詳細 →「シークレットの値を取得する」→「編集」で値を変更する。)
 期待する結果: `refreshInterval` (1m) 後に `P@ssw0rd-from-aws-v2` へ更新される。
@@ -361,13 +363,13 @@ oc get secret demo-secret-aws -n eso-test -o jsonpath='{.data.password}' | base6
 ESO と AWS 側権限の関係を確認する。
 ```bash
 aws iam detach-role-policy --role-name rosa-eso-demo \
-  --policy-arn arn:aws:iam::<アカウントID>:policy/rosa-eso-demo-read
+  --policy-arn arn:aws:iam::<ACCOUNT_ID>:policy/rosa-eso-demo-read
 # 次の refresh 後
-oc get externalsecret demo-secret-aws -n eso-test      # STATUS が失敗側 (SecretSyncedError) になる
-oc get secret demo-secret-aws -n eso-test              # 同期済みの Secret は残る
+oc get externalsecret <TARGET_SECRET> -n <TARGET_NAMESPACE>      # STATUS が失敗側 (SecretSyncedError) になる
+oc get secret <TARGET_SECRET> -n <TARGET_NAMESPACE>              # 同期済みの Secret は残る
 # 確認後に再 attach
 aws iam attach-role-policy --role-name rosa-eso-demo \
-  --policy-arn arn:aws:iam::<アカウントID>:policy/rosa-eso-demo-read
+  --policy-arn arn:aws:iam::<ACCOUNT_ID>:policy/rosa-eso-demo-read
 ```
 
 ## 5. トラブルシュート
@@ -378,7 +380,7 @@ aws iam attach-role-policy --role-name rosa-eso-demo \
 | Operator が `Succeeded` にならない | InstallPlan の承認、cert-manager を先に導入したか (2 章) |
 | ESO の Pod が出ない | §3.3 の `ExternalSecretsConfig` (name: `cluster`) を作成したか |
 | SecretStore が Invalid、イベントに `dial tcp ... i/o timeout` | **ESO の Pod から AWS に出られない。** `external-secrets` の NetworkPolicy (`eso-sys-deny-all-traffic` 等) が原因。§4.4.1 の NetworkPolicy を追加する。別 Namespace の Pod から curl が通っても、ESO の Pod は別扱い |
-| SecretStore が Invalid、`AccessDenied` / `sts:AssumeRoleWithWebIdentity` エラー | **信頼ポリシーの `sub` (Namespace 名 / ServiceAccount 名) と、クラスタ上の実際の名前が一致しているか** 。`aud` が `sts.amazonaws.com` か、ServiceAccount の `eks.amazonaws.com/role-arn` 注釈が `<Role ARN>` と一致しているか |
+| SecretStore が Invalid、`AccessDenied` / `sts:AssumeRoleWithWebIdentity` エラー | **信頼ポリシーの `sub` (Namespace 名 / ServiceAccount 名) と、クラスタ上の実際の名前が一致しているか** 。`aud` が `sts.amazonaws.com` か、ServiceAccount の `eks.amazonaws.com/role-arn` 注釈が `<ROLE_ARN>` と一致しているか |
 | 同上 (OIDC) | 信頼ポリシーの OIDC ホストパスが `rosa describe cluster` の OIDC URL (`https://` なし、末尾 `/` なし) と一致しているか。IAM の「ID プロバイダ」に存在するか |
 | `AccessDeniedException` (Secrets Manager) | 権限ポリシーの Resource ARN、リージョン、シークレット名 |
 | ESO が SA トークンを発行できない | ESO ログ。コントローラーの権限 (`serviceaccounts/token` の create) |
@@ -400,14 +402,14 @@ aws iam attach-role-policy --role-name rosa-eso-demo \
 ## 7. 後片付け
 
 ```bash
-oc delete project eso-test
+oc delete project <TARGET_NAMESPACE>
 oc delete networkpolicy allow-aws-egress-for-main-controller -n external-secrets
 
-aws iam detach-role-policy --role-name rosa-eso-demo --policy-arn arn:aws:iam::<アカウントID>:policy/rosa-eso-demo-read
+aws iam detach-role-policy --role-name rosa-eso-demo --policy-arn arn:aws:iam::<ACCOUNT_ID>:policy/rosa-eso-demo-read
 aws iam delete-role   --role-name rosa-eso-demo
-aws iam delete-policy --policy-arn arn:aws:iam::<アカウントID>:policy/rosa-eso-demo-read
-aws secretsmanager delete-secret --region <リージョン> --secret-id <シークレット名> --recovery-window-in-days 7
-rosa delete admin -c <クラスタ名>      # 作成した場合
+aws iam delete-policy --policy-arn arn:aws:iam::<ACCOUNT_ID>:policy/rosa-eso-demo-read
+aws secretsmanager delete-secret --region <REGION> --secret-id <REMOTE_SECRET_NAME> --recovery-window-in-days 7
+rosa delete admin -c <CLUSTER_NAME>      # 作成した場合
 ```
 
 - ESO / cert-manager をアンインストールする場合は、2 章の Limitations のとおり残ったリソースを手動で削除する
