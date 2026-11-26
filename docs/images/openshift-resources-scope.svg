@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" width="1200" height="640" font-family="'Noto Sans JP','Noto Sans CJK JP','Hiragino Sans','Hiragino Kaku Gothic ProN','Yu Gothic UI','Meiryo',sans-serif">
+  <defs><marker id="arr-teal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#37a3a3"/></marker><marker id="arr-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b6b6b"/></marker><marker id="arr-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#d10000"/></marker></defs>
+  <rect width="1200" height="640" fill="#ffffff"/>
+  <text x="600.0" y="52" text-anchor="middle" font-size="26" fill="#d10000">OpenShift 上で作成するリソースとスコープ</text>
+  <rect x="300" y="79" width="26" height="18" rx="4" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="334" y="93" text-anchor="start" font-size="14" fill="#555555">プラットフォームチームが管理</text>
+  <rect x="554" y="79" width="26" height="18" rx="4" fill="#ffffff" stroke="#4d4d4d" stroke-width="2"/>
+  <text x="588" y="93" text-anchor="start" font-size="14" fill="#555555">アプリチームが管理</text>
+  <rect x="733" y="79" width="26" height="18" rx="4" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="767" y="93" text-anchor="start" font-size="14" fill="#555555">自動で作成</text>
+  <path d="M40,112 H1160 V208 Q1160,230 1138,230 H62 Q40,230 40,208 Z" fill="#ffffff" stroke="#37a3a3" stroke-width="3"/>
+  <rect x="40" y="112" width="1120" height="40" fill="#37a3a3"/>
+  <text x="600.0" y="138.12" text-anchor="middle" font-size="17" fill="#ffffff">クラスタ スコープ (Namespace に属さない)</text>
+  <rect x="80" y="168" width="320" height="48" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="240.0" y="197.8" text-anchor="middle" font-size="16" fill="#1f7a7a" font-weight="bold">ExternalSecretsConfig (cluster)</text>
+  <rect x="440" y="168" width="320" height="48" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="600.0" y="197.8" text-anchor="middle" font-size="16" fill="#1f7a7a" font-weight="bold">Namespace</text>
+  <rect x="800" y="168" width="320" height="48" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="960.0" y="197.8" text-anchor="middle" font-size="16" fill="#1f7a7a" font-weight="bold">ClusterSecretStore (本番案)</text>
+  <text x="600" y="258" text-anchor="middle" font-size="17" fill="#1f7a7a" font-weight="bold">Namespace スコープ (Namespace の中に作る)</text>
+  <rect x="40" y="276" width="300" height="290" rx="12" fill="#ffffff" stroke="#b3b3b3" stroke-width="2"/>
+  <path d="M40,288 Q40,276 52,276 H328 Q340,276 340,288 V310 H40 Z" fill="#b3b3b3"/>
+  <text x="190.0" y="299" text-anchor="middle" font-size="15" fill="#ffffff">external-secrets-operator 等</text>
+  <rect x="65" y="330" width="250" height="56" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="190.0" y="353.0" text-anchor="middle" font-size="16" fill="#1f7a7a" font-weight="bold">Operator</text>
+  <text x="190.0" y="374.6" text-anchor="middle" font-size="13" fill="#555555">cert-manager / ESO</text>
+  <rect x="360" y="276" width="360" height="290" rx="12" fill="#ffffff" stroke="#b3b3b3" stroke-width="2"/>
+  <path d="M360,288 Q360,276 372,276 H708 Q720,276 720,288 V310 H360 Z" fill="#b3b3b3"/>
+  <text x="540.0" y="299" text-anchor="middle" font-size="15" fill="#ffffff">external-secrets</text>
+  <rect x="385" y="322" width="310" height="56" rx="8" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="540.0" y="355.8" text-anchor="middle" font-size="16" fill="#555555">ESO 本体の Pod</text>
+  <rect x="385" y="392" width="310" height="56" rx="8" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="540.0" y="415.0" text-anchor="middle" font-size="16" fill="#555555">NetworkPolicy eso-sys-*</text>
+  <text x="540.0" y="436.6" text-anchor="middle" font-size="13" fill="#555555">通信制限。編集しない</text>
+  <rect x="385" y="462" width="310" height="56" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="540.0" y="485.0" text-anchor="middle" font-size="16" fill="#1f7a7a" font-weight="bold">NetworkPolicy 外向き許可</text>
+  <text x="540.0" y="506.6" text-anchor="middle" font-size="13" fill="#555555">ROSA で追加</text>
+  <rect x="740" y="276" width="420" height="290" rx="12" fill="#ffffff" stroke="#4d4d4d" stroke-width="2"/>
+  <path d="M740,288 Q740,276 752,276 H1148 Q1160,276 1160,288 V310 H740 Z" fill="#4d4d4d"/>
+  <text x="950.0" y="299" text-anchor="middle" font-size="15" fill="#ffffff">&lt;TARGET_NAMESPACE&gt; (アプリごと)</text>
+  <rect x="765" y="318" width="370" height="40" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="950.0" y="343.8" text-anchor="middle" font-size="16" fill="#1f7a7a" font-weight="bold">ServiceAccount</text>
+  <rect x="765" y="366" width="370" height="40" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="950.0" y="391.8" text-anchor="middle" font-size="16" fill="#1f7a7a" font-weight="bold">Secret: API キー (OCI)</text>
+  <rect x="765" y="414" width="370" height="40" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="950.0" y="439.8" text-anchor="middle" font-size="16" fill="#1f7a7a" font-weight="bold">SecretStore</text>
+  <rect x="765" y="462" width="370" height="40" rx="8" fill="#ffffff" stroke="#4d4d4d" stroke-width="2"/>
+  <text x="950.0" y="487.8" text-anchor="middle" font-size="16" fill="#333333" font-weight="bold">ExternalSecret</text>
+  <rect x="765" y="510" width="370" height="40" rx="8" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="950.0" y="535.8" text-anchor="middle" font-size="16" fill="#555555">Secret: 同期先</text>
+  <rect x="40" y="584" width="1120" height="40" rx="16" fill="#ededed"/>
+  <text x="600.0" y="610" text-anchor="middle" font-size="17" fill="#333333">アプリチームが作るのは <tspan fill="#4d4d4d" font-weight="bold">ExternalSecret</tspan> だけ。それ以外はプラットフォームチームが用意するか、自動で作成される。</text>
+</svg>
