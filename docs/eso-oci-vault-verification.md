@@ -1,6 +1,6 @@
-# ESO × OCI Vault 検証まとめ (OpenShift on OCI)
+# ESO × OCI Vault 導入・動作確認手順 (OpenShift on OCI)
 
-OpenShift on OCI 上の検証クラスタに External Secrets Operator (ESO) を導入し、OCI Vault のシークレットを Kubernetes Secret として同期できるかを確認した記録。
+OpenShift on OCI 上のクラスタに External Secrets Operator (ESO) を導入し、OCI Vault のシークレットを Kubernetes Secret として同期できることを確認する手順。
 
 - 検証に使った YAML → [yaml/eso/oci/](../yaml/eso/oci/)
 
@@ -25,7 +25,7 @@ OpenShift on OCI 上の検証クラスタに External Secrets Operator (ESO) を
 | cert-manager | cert-manager Operator for Red Hat OpenShift 1.20.1 (チャネル `stable-v1.20`) |
 | OCI Region | ap-tokyo-1 |
 | 認証方式 | User Principal (API キー) |
-| 作業端末 | クラスタ内の OpenShift Dev Spaces (`oc` は kubeadmin で実行) |
+| 作業端末 | クライアント端末 (`oc` / `oci` CLI) |
 | 検証用 Namespace | `eso-test` |
 
 ### 構成
@@ -37,17 +37,6 @@ ESO (SecretStore: oci-vault / ExternalSecret: demo-secret)
         ↓ 同期
 Kubernetes Secret: demo-secret (key: password)
 ```
-
-### 結果サマリ
-
-| 確認項目 | 結果 |
-|---|---|
-| cert-manager Operator / ESO のインストール | 成功 |
-| OCI Vault・Master Encryption Key・シークレットの作成 | 成功 |
-| 認証情報 Secret (`oci-credentials`) の作成 | 成功 |
-| SecretStore が OCI Vault に接続できる | 成功 (`Valid` / `Ready=True` / `ReadWrite`) |
-| ExternalSecret による Secret 同期 | 成功 (`SecretSynced` / `Ready=True`、`P@ssw0rd-from-oci` を取得) |
-| OCI 側の値更新が追従する | 成功 (`refreshInterval=1m` 後に `P@ssw0rd-from-oci-v2` へ更新) |
 
 ### サポート上の注意
 
@@ -161,7 +150,7 @@ Key: 作成した Vault の「マスター暗号化キー」タブで作成
 
 ### 4.2 シークレットの作成 (OCI Cloud Shell)
 
-Dev Spaces に `oci` CLI が無かったため、Cloud Shell で作成した (コンソールからの作成でも可)。
+`oci` CLI が使える端末、OCI Cloud Shell、またはコンソールで作成する。
 
 ```bash
 oci vault secret create-base64 \
@@ -172,27 +161,27 @@ oci vault secret create-base64 \
   --secret-content-content "$(echo -n 'P@ssw0rd-from-oci' | base64)"
 ```
 
-`oci vault secret list --compartment-id <コンパートメント OCID>` で、`eso-demo-password` が `ACTIVE` であることを確認した (作成直後は `CREATING`)。
+`oci vault secret list --compartment-id <コンパートメント OCID>` で、`eso-demo-password` が `ACTIVE` であることを確認する (作成直後は `CREATING`)。
 
 ### 4.3 API キーの登録と認証情報 Secret の作成
 
 **OCI コンソール:** 対象ユーザーの API keys → Add API key → Generate API key pair → 秘密鍵をダウンロードして Add。表示される構成プレビューから `user`、`fingerprint`、`tenancy`、`region` を控える。
 (API キーは 1 ユーザーあたり 3 つまで)
 
-**Dev Spaces:** ダウンロードした秘密鍵をワークスペースに置き、Secret を作成する。
+**クライアント端末:** ダウンロードした秘密鍵を端末に置き、Secret を作成する。
 
 ```bash
 oc new-project eso-test
 
 oc create secret generic oci-credentials -n eso-test \
-  --from-file=privateKey=/home/user/oci_api_key.pem \
+  --from-file=privateKey=<秘密鍵 PEM のパス> \
   --from-literal=fingerprint='<フィンガープリント>'
 ```
 ```
 secret/oci-credentials created
 ```
 
-> 秘密鍵は Git に置かない。検証後はワークスペースの `.pem` を削除し、OCI 側の API キーも不要なら削除する。
+> 秘密鍵は Git に置かない。検証後は端末上の `.pem` を削除し、OCI 側の API キーも不要なら削除する。
 > [yaml/eso/oci/01-oci-credentials_example.yaml](../yaml/eso/oci/01-oci-credentials_example.yaml) は書式の参考用で、実際の値は入れない。
 
 ### 4.4 SecretStore の作成と接続確認
@@ -337,14 +326,13 @@ P@ssw0rd-from-oci-v2
 ~ $ 
 ```
 
-
 ## 5. トラブルシュート
 
 | 症状 | 確認 |
 |---|---|
 | SecretStore が Invalid | `oc describe secretstore oci-vault -n eso-test`。fingerprint・user・tenancy OCID・秘密鍵の組み合わせを確認 |
 | 401 / 404 | IAM ポリシー不足 (最低限 `read secret-family`)、Vault OCID / Region の誤り、シークレット名の誤り |
-| タイムアウト | Dev Spaces やクラスタから OCI API への egress 制限 |
+| タイムアウト | クライアント端末やクラスタから OCI API への egress 制限 |
 | ESO のログ | `oc logs -n external-secrets deploy/external-secrets` (名前空間は環境により異なるため `oc get po -A \| grep external-secrets` で確認) |
 | cert-manager 関連で ESO が不調 | 2 章の Limitations を参照。ESO の Operator Pod を再起動する |
 
@@ -354,7 +342,7 @@ README の環境別比較のとおり、OpenShift on OCI では認証方式が�
 
 | 方式 | 特徴 | 課題 |
 |---|---|---|
-| User Principal (API キー) ← 今回 | 手軽。検証向き | 秘密鍵の保管とローテーションが必要。鍵が漏れると Vault に直接アクセスされる |
+| User Principal (API キー) ← 本書の構成 | 手軽。検証向き | 秘密鍵の保管とローテーションが必要。鍵が漏れると Vault に直接アクセスされる |
 | Instance Principal | 鍵の管理が不要 | ノード単位の権限になり粒度が粗い (Dynamic Group + Policy で絞る) |
 | Workload Identity | Pod / ServiceAccount 単位で絞れる | OKE 向けが中心。OpenShift on OCI での利用可否は未確認 |
 
@@ -367,5 +355,5 @@ oc delete project eso-test
 ```
 
 - OCI: シークレット (削除予約、最短 1 日)・Key (削除予約、最短 7 日)・不要な API キーを削除する
-- Dev Spaces: ワークスペース上の秘密鍵 (`.pem`) を削除する
+- クライアント端末: 秘密鍵 (`.pem`) を削除する
 - ESO / cert-manager をアンインストールする場合は、2 章の Limitations のとおり残ったリソースを手動で削除する

@@ -1,11 +1,10 @@
 # ESO on ROSA 検証手順 (ROSA 単体)
 
 ROSA クラスタに External Secrets Operator (ESO) を導入し、Secret が同期されることを確認する手順。
-OCI Vault 検証 ([eso-oci-vault-verification.md](eso-oci-vault-verification.md)) と同じ章立てで、**ROSA と AWS だけで完結**させる (OCI は使わない)。
+**ROSA と AWS だけで完結**する構成 (外部ストアは AWS Secrets Manager、認証は ROSA の STS / OIDC)。
 
 - 検証に使う YAML → [yaml/eso/aws/](../yaml/eso/aws/)、[yaml/aws-iam/](../yaml/aws-iam/)
 - YAML / JSON 内の `<...>` は、§2.2 で確認した自分の環境の値に置き換えてから使う。
-- 実施記録 (結果・出力) は §1 の結果サマリと各節の「実測」欄に追記する。
 
 ## 0. 検証開始前に確定させる項目 (ヒアリング・確認事項)
 
@@ -22,12 +21,12 @@ OCI Vault 検証 ([eso-oci-vault-verification.md](eso-oci-vault-verification.md)
 | 項目 | 内容 |
 |---|---|
 | 目的 | ROSA 上で ESO が動作し、外部ストアの値を K8s Secret に同期できることを確認する |
-| クラスタ | ROSA (検証用クラスタ。Classic / HCP は実施時に記入: ______) |
-| ESO | External Secrets Operator for Red Hat OpenShift (OCI 検証と同じ `stable-v1.2` 系を想定) |
-| cert-manager | cert-manager Operator for Red Hat OpenShift (OCI 検証と同じ `stable-v1.20` 系を想定) |
+| クラスタ | ROSA (検証用クラスタ) |
+| ESO | External Secrets Operator for Red Hat OpenShift 1.2.1 (チャネル `stable-v1.2`) |
+| cert-manager | cert-manager Operator for Red Hat OpenShift 1.20.1 (チャネル `stable-v1.20`) |
 | バックエンド | ① fake (ダミー。外部不要) → ② AWS Secrets Manager |
 | 認証方式 (②) | ROSA の STS / OIDC (ServiceAccount トークン → `AssumeRoleWithWebIdentity`)。**アクセスキーは作らない** |
-| 作業端末 | 別クライアント端末 (`oc` / `rosa` / `aws` CLI) |
+| 作業端末 | クライアント端末 (`oc` / `rosa` / `aws` CLI) |
 | 検証用 Namespace | `eso-test` |
 
 ### 構成
@@ -41,19 +40,6 @@ ESO (SecretStore / ExternalSecret)
 Kubernetes Secret (key: password)
 ```
 
-### 結果サマリ
-
-| 確認項目 | 結果 |
-|---|---|
-| ROSA へのログイン (`oc whoami`) | 実施済み |
-| cert-manager Operator / ESO のインストール | 実施済み (Pod は全て Running) |
-| ESO 本体の展開 (`ExternalSecretsConfig`) | 実施済み |
-| ① fake: SecretStore `Valid` / ExternalSecret `SecretSynced` | 実施済み (値の一致も確認) |
-| ② AWS: Secrets Manager のシークレット / IAM Role の作成 | 実施済み (IAM Role は管理者に依頼して作成) |
-| ② AWS: SecretStore が AWS に接続できる (`Valid`) | 実施済み (**NetworkPolicy の追加が必要**。§4.4) |
-| ② AWS: ExternalSecret による同期 | 実施済み |
-| ② AWS: 値の更新が追従する | 未実施 |
-
 ### 進め方
 **①で ESO 自体が動くことを確認してから、②で AWS 連携を行う。** ②が失敗した場合に「ESO の問題」か「AWS 側の問題」かを切り分けるため。
 
@@ -63,7 +49,7 @@ Kubernetes Secret (key: password)
 - [External Secrets Operator for Red Hat OpenShift](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/security_and_compliance/index#external-secrets-operator-for-red-hat-openshift) (ROSA の OCP バージョンに合わせて参照)
 - [ROSA のドキュメント](https://docs.redhat.com/en/documentation/red_hat_openshift_service_on_aws)
 
-### Limitations (OCI 検証と同じ)
+### Limitations
 - Operator をアンインストールしても、external-secrets 用に作られたリソースは削除されない。手動で削除する。
 - **cert-manager Operator は ESO より先にインストールしておく。** 後から入れた場合は `external-secrets-operator` の Pod を手動で再起動する。
 - ROSA ではクラスタ管理の Namespace・リソースを変更できない場合がある。Operator 導入に `cluster-admin` 相当が必要。
@@ -109,7 +95,6 @@ oc get nodes
 oc auth can-i '*' '*' --all-namespaces      # yes なら Operator 導入可
 ```
 - Private クラスタの場合は VPN / 踏み台経由で API に到達できること。
-- 実測: `oc whoami` = ______ / ROSA 種別 = ______ / OCP バージョン = ______
 
 ### 2.4 クラスタからの外部通信 (②のみ)
 Pod から AWS の STS / Secrets Manager に出られること。ROSA は通常 egress 可だが、制限環境では確認する。
@@ -126,15 +111,13 @@ HTTP コードが返れば (302 / 400 / 403 / 404 でも) 到達 OK。タイム�
 ## 3. 導入手順と結果
 
 ### 3.1 cert-manager Operator
-OCI 検証と同じ手順。
 
 1. ROSA の Web コンソール (`<Console URL>`) → OperatorHub から **cert-manager Operator for Red Hat OpenShift** をインストール
-   - チャネル: `stable-v1.20` / 更新の承認: 手動 / その他デフォルト
+   - チャネル: `stable-v1.20` / バージョン: 1.20.1 / 更新の承認: 手動 / その他デフォルト
    - **ROSA (STS クラスタ) では「Role ARN」欄が表示される。** cert-manager が AWS (Route53 の DNS-01 など) を操作するための IAM Role を指定する欄。
      ESO の用途では cert-manager は webhook 用の内部証明書発行にしか使わず AWS 権限は不要なので、**本検証では実質使われない**。
-     - 今回の実施: 管理者ではない自分の **IAM ユーザー ARN** (`arn:aws:iam::<アカウントID>:user/...`) を入力してインストール → 全 Pod が Running で、ESO 検証には影響なし。
-     - ただし本来は ROSA の OIDC を信頼する **IAM Role の ARN** (`...:role/...`) を入れる欄であり、ユーザー ARN は正しい値ではない (cert-manager で Route53 / ACME を使うと失敗する)。
-     - 次回以降は、空欄にできるなら空欄、必須なら IAM Role の ARN を入力する。誤値を直す場合は Subscription の `ROLEARN` を修正する。
+     - 入れるべき値は ROSA の OIDC を信頼する **IAM Role の ARN** (`...:role/...`)。IAM ユーザー ARN など Role 以外の値を入れてもインストールと ESO の動作には影響しないが、cert-manager で Route53 / ACME を使うと失敗する。
+     - 次回以降は、空欄にできるなら空欄、必須なら IAM Role の ARN を入力する。誤った値を入れた場合は Subscription の `ROLEARN` を修正する。
        ```bash
        oc get subscription -n cert-manager-operator -o yaml | grep -i -B2 -A2 ROLEARN
        ```
@@ -146,11 +129,9 @@ OCI 検証と同じ手順。
    ```
    想定: `cert-manager-operator-controller-manager-...  1/1  Running`
 
-実測: 全 Pod が Running
-
 ### 3.2 External Secrets Operator for Red Hat OpenShift
 1. OperatorHub から **External Secrets Operator for Red Hat OpenShift** をインストール
-   - チャネル: `stable-v1.2` / 更新の承認: 手動 / その他デフォルト
+   - チャネル: `stable-v1.2` / バージョン: 1.2.1 / 更新の承認: 手動 / その他デフォルト
 2. InstallPlan を承認
 3. インストール済み Operator で ESO が `Succeeded` になることを確認
 4. 確認
@@ -159,8 +140,6 @@ OCI 検証と同じ手順。
    ```
    想定: `external-secrets-operator-controller-manager-...  1/1  Running`
 
-実測: インストール完了
-
 ### 3.3 ESO 本体 (operand) の展開
 Operator は ESO 本体 (`external-secrets` Namespace の Pod 群) を管理するが、本体は `ExternalSecretsConfig` (name は `cluster`) を作成して初めて展開される。
 **まず展開済みか確認し、何も無い場合のみ作成する。**
@@ -168,7 +147,6 @@ Operator は ESO 本体 (`external-secrets` Namespace の Pod 群) を管理す�
 oc get po -n external-secrets
 oc get externalsecretsconfigs.operator.openshift.io
 ```
-ROSA での実績: 上記は何も無かったため作成した。
 ```bash
 cat <<'EOF' | oc apply -f -
 apiVersion: operator.openshift.io/v1alpha1
@@ -183,8 +161,6 @@ oc get crd | grep external-secrets.io
 ```
 想定: `external-secrets` / `external-secrets-cert-controller` / `external-secrets-webhook` の Pod が `Running`、`externalsecrets.external-secrets.io` などの CRD が存在。
 ※ apiVersion はバージョン依存。`oc explain externalsecretsconfig` で確認する。
-
-実測: 作成後、ESO 本体の Pod が起動
 
 ## 4. 検証
 
@@ -258,8 +234,6 @@ oc logs -n external-secrets deploy/external-secrets --tail=50
 合格条件: SecretStore が `Valid`、ExternalSecret が `SecretSynced`、値が一致。
 ※ `fake` provider が使えないバージョンの場合は §4.1 を飛ばして §4.2 へ進む。
 
-実測: SecretStore / ExternalSecret とも問題なく作成でき、イベントにもエラーなし。Secret の値 `P@ssw0rd-from-fake` の一致も確認済み。
-
 ### 4.2 ② AWS Secrets Manager にシークレットを作成
 AWS CLI で作成する場合:
 ```bash
@@ -280,8 +254,6 @@ aws secretsmanager describe-secret --region <リージョン> \
 6. シークレット名: `<シークレット名>` (例: `rosa-demo/password`) → 次へ (ローテーション: 無効のまま) → 保存
 7. 作成後、シークレットの詳細画面で **シークレットの ARN** を控える (例: `arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:rosa-demo/password-AbCdEf`)
    - 権限ポリシー (§4.3) の `Resource` には **この完全な ARN** を使う
-
-実測: コンソールで作成済み
 
 ### 4.3 IAM Role の作成 (ROSA の OIDC を信頼)
 ESO が使う ServiceAccount (`<Namespace 名>/<ServiceAccount 名>`) だけがこの Role を引き受けられるようにする。アクセスキーは作らない。
@@ -334,8 +306,6 @@ aws iam attach-role-policy --role-name rosa-eso-demo \
 ```
 コンソールの場合: IAM →「ポリシー」で ① を作成 →「ロール」→「ロールを作成」→ カスタム信頼ポリシーに ② を貼る → ① をアタッチ。
 
-実測: 管理者に依頼して作成済み
-
 ### 4.4 NetworkPolicy・ServiceAccount・SecretStore の作成と接続確認
 
 #### 4.4.1 ESO から AWS への通信を許可する NetworkPolicy (必須)
@@ -353,8 +323,6 @@ oc apply -f yaml/eso/aws/networkpolicy-allow-aws-egress.yaml
 ```
 - 宛先は検証用に限定していない (AWS の IP は可変で、NetworkPolicy では FQDN を指定できないため)。本番では VPC エンドポイント経由にする、または宛先 FQDN で制限できる仕組みを検討する。
 
-実測: NetworkPolicy を追加して AWS への接続が可能になった
-
 #### 4.4.2 ServiceAccount と SecretStore
 [yaml/eso/aws/serviceaccount.yaml](../yaml/eso/aws/serviceaccount.yaml) の `<Role ARN>`、[yaml/eso/aws/secretstore.yaml](../yaml/eso/aws/secretstore.yaml) の `<リージョン>` を置き換えて適用する。
 ```bash
@@ -369,8 +337,6 @@ aws-sm   10s   Valid    ReadWrite      True
 ```
 `Valid` にならない場合は §5 を参照。
 
-実測: `Valid` になることを確認
-
 ### 4.5 ExternalSecret による同期の確認
 [yaml/eso/aws/externalsecret.yaml](../yaml/eso/aws/externalsecret.yaml) の `<シークレット名>` を置き換えて適用する。
 ```bash
@@ -379,8 +345,6 @@ oc get externalsecret demo-secret-aws -n eso-test
 oc get secret demo-secret-aws -n eso-test -o jsonpath='{.data.password}' | base64 -d; echo
 ```
 期待する結果: `SecretSynced` / `Ready=True`、`P@ssw0rd-from-aws` が取得できる。
-
-実測: 同期されることを確認
 
 ### 4.6 更新追従の確認
 ```bash
@@ -392,8 +356,6 @@ oc get secret demo-secret-aws -n eso-test -o jsonpath='{.data.password}' | base6
 ```
 (コンソールの場合: Secrets Manager → シークレット詳細 →「シークレットの値を取得する」→「編集」で値を変更する。)
 期待する結果: `refreshInterval` (1m) 後に `P@ssw0rd-from-aws-v2` へ更新される。
-
-実測: ______
 
 ### 4.7 (任意) 権限を外した場合の挙動
 ESO と AWS 側権限の関係を確認する。
@@ -408,8 +370,6 @@ aws iam attach-role-policy --role-name rosa-eso-demo \
   --policy-arn arn:aws:iam::<アカウントID>:policy/rosa-eso-demo-read
 ```
 
-実測: ______
-
 ## 5. トラブルシュート
 
 | 症状 | 確認 |
@@ -418,7 +378,7 @@ aws iam attach-role-policy --role-name rosa-eso-demo \
 | Operator が `Succeeded` にならない | InstallPlan の承認、cert-manager を先に導入したか (2 章) |
 | ESO の Pod が出ない | §3.3 の `ExternalSecretsConfig` (name: `cluster`) を作成したか |
 | SecretStore が Invalid、イベントに `dial tcp ... i/o timeout` | **ESO の Pod から AWS に出られない。** `external-secrets` の NetworkPolicy (`eso-sys-deny-all-traffic` 等) が原因。§4.4.1 の NetworkPolicy を追加する。別 Namespace の Pod から curl が通っても、ESO の Pod は別扱い |
-| SecretStore が Invalid、`AccessDenied` / `sts:AssumeRoleWithWebIdentity` エラー | **信頼ポリシーの `sub` (Namespace 名 / ServiceAccount 名) と、クラスタ上の実際の名前が一致しているか** (不一致が原因になった事例あり)。`aud` が `sts.amazonaws.com` か、ServiceAccount の `eks.amazonaws.com/role-arn` 注釈が `<Role ARN>` と一致しているか |
+| SecretStore が Invalid、`AccessDenied` / `sts:AssumeRoleWithWebIdentity` エラー | **信頼ポリシーの `sub` (Namespace 名 / ServiceAccount 名) と、クラスタ上の実際の名前が一致しているか** 。`aud` が `sts.amazonaws.com` か、ServiceAccount の `eks.amazonaws.com/role-arn` 注釈が `<Role ARN>` と一致しているか |
 | 同上 (OIDC) | 信頼ポリシーの OIDC ホストパスが `rosa describe cluster` の OIDC URL (`https://` なし、末尾 `/` なし) と一致しているか。IAM の「ID プロバイダ」に存在するか |
 | `AccessDeniedException` (Secrets Manager) | 権限ポリシーの Resource ARN、リージョン、シークレット名 |
 | ESO が SA トークンを発行できない | ESO ログ。コントローラーの権限 (`serviceaccounts/token` の create) |
@@ -427,7 +387,7 @@ aws iam attach-role-policy --role-name rosa-eso-demo \
 
 ## 6. 本番利用に向けた課題
 
-| 観点 | 今回の構成 | 本番での論点 |
+| 観点 | 本書の構成 | 本番での論点 |
 |---|---|---|
 | 認証 | STS / OIDC (静的キーなし) | ROSA では標準的で推奨。Role は用途ごとに分割し、`sub` で ServiceAccount を限定する |
 | スコープ | Namespace 単位の `SecretStore` | 共通利用は `ClusterSecretStore`。作成・参照できる人を絞る |
