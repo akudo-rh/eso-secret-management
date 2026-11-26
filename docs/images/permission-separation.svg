@@ -1,73 +1,69 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 712" width="1200" height="712" font-family="'Noto Sans JP','Noto Sans CJK JP','Hiragino Sans','Hiragino Kaku Gothic ProN','Yu Gothic UI','Meiryo',sans-serif">
-  <defs><marker id="arr-teal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#37a3a3"/></marker><marker id="arr-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b6b6b"/></marker><marker id="arr-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#d10000"/></marker></defs>
-  <rect width="1200" height="712" fill="#ffffff"/>
-  <text x="600.0" y="52" text-anchor="middle" font-size="26" fill="#d10000">権限分離の全体図 (OCI + Workload Identity の案)</text>
-  <rect x="300" y="79" width="26" height="18" rx="4" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
-  <text x="334" y="93" text-anchor="start" font-size="14" fill="#555555">プラットフォームチームが管理</text>
-  <rect x="554" y="79" width="26" height="18" rx="4" fill="#ffffff" stroke="#4d4d4d" stroke-width="2"/>
-  <text x="588" y="93" text-anchor="start" font-size="14" fill="#555555">アプリチームが管理</text>
-  <rect x="733" y="79" width="26" height="18" rx="4" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5" stroke-dasharray="6 4"/>
-  <text x="767" y="93" text-anchor="start" font-size="14" fill="#555555">自動で作成</text>
-  <path d="M40,112 H640 V560 Q640,582 618,582 H62 Q40,582 40,560 Z" fill="#ffffff" stroke="#c8c8c8" stroke-width="2"/>
-  <rect x="40" y="112" width="600" height="48" fill="#b3b3b3"/>
-  <text x="340.0" y="142.84" text-anchor="middle" font-size="19" fill="#ffffff">OpenShift クラスタ (環境ごと)</text>
-  <rect x="70" y="178" width="540" height="50" rx="8" fill="#37a3a3" stroke="#37a3a3" stroke-width="2"/>
-  <text x="340.0" y="209.5" text-anchor="middle" font-size="18" fill="#ffffff" font-weight="bold">ESO</text>
-  <rect x="70" y="248" width="260" height="310" rx="12" fill="#ffffff" stroke="#4d4d4d" stroke-width="2"/>
-  <path d="M70,260 Q70,248 82,248 H318 Q330,248 330,260 V282 H70 Z" fill="#4d4d4d"/>
-  <text x="200.0" y="271" text-anchor="middle" font-size="15" fill="#ffffff">Namespace: アプリ A</text>
-  <rect x="90" y="292" width="220" height="46" rx="8" fill="#ffffff" stroke="#4d4d4d" stroke-width="2"/>
-  <text x="200.0" y="320.8" text-anchor="middle" font-size="16" fill="#333333" font-weight="bold">ExternalSecret</text>
-  <rect x="90" y="356" width="220" height="46" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
-  <text x="200.0" y="384.8" text-anchor="middle" font-size="16" fill="#1f7a7a" font-weight="bold">SecretStore</text>
-  <rect x="90" y="420" width="220" height="46" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
-  <text x="200.0" y="448.8" text-anchor="middle" font-size="16" fill="#1f7a7a" font-weight="bold">ServiceAccount A</text>
-  <rect x="90" y="484" width="220" height="46" rx="8" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5" stroke-dasharray="6 4"/>
-  <text x="200.0" y="512.8" text-anchor="middle" font-size="16" fill="#555555">Secret</text>
-  <path d="M200,339 L200,353" fill="none" stroke="#6b6b6b" stroke-width="2" marker-end="url(#arr-gray)"/>
-  <path d="M200,403 L200,417" fill="none" stroke="#6b6b6b" stroke-width="2" marker-end="url(#arr-gray)"/>
-  <rect x="350" y="248" width="260" height="310" rx="12" fill="#ffffff" stroke="#4d4d4d" stroke-width="2"/>
-  <path d="M350,260 Q350,248 362,248 H598 Q610,248 610,260 V282 H350 Z" fill="#4d4d4d"/>
-  <text x="480.0" y="271" text-anchor="middle" font-size="15" fill="#ffffff">Namespace: アプリ B</text>
-  <rect x="370" y="292" width="220" height="46" rx="8" fill="#ffffff" stroke="#4d4d4d" stroke-width="2"/>
-  <text x="480.0" y="320.8" text-anchor="middle" font-size="16" fill="#333333" font-weight="bold">ExternalSecret</text>
-  <rect x="370" y="356" width="220" height="46" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
-  <text x="480.0" y="384.8" text-anchor="middle" font-size="16" fill="#1f7a7a" font-weight="bold">SecretStore</text>
-  <rect x="370" y="420" width="220" height="46" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
-  <text x="480.0" y="448.8" text-anchor="middle" font-size="16" fill="#1f7a7a" font-weight="bold">ServiceAccount B</text>
-  <rect x="370" y="484" width="220" height="46" rx="8" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5" stroke-dasharray="6 4"/>
-  <text x="480.0" y="512.8" text-anchor="middle" font-size="16" fill="#555555">Secret</text>
-  <path d="M480,339 L480,353" fill="none" stroke="#6b6b6b" stroke-width="2" marker-end="url(#arr-gray)"/>
-  <path d="M480,403 L480,417" fill="none" stroke="#6b6b6b" stroke-width="2" marker-end="url(#arr-gray)"/>
-  <path d="M700,112 H1160 V560 Q1160,582 1138,582 H722 Q700,582 700,560 Z" fill="#f2f2f2"/>
-  <rect x="700" y="112" width="460" height="48" fill="#b3b3b3"/>
-  <text x="930.0" y="142.84" text-anchor="middle" font-size="19" fill="#ffffff">OCI テナンシ</text>
-  <rect x="730" y="178" width="400" height="56" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
-  <text x="930.0" y="201.0" text-anchor="middle" font-size="16" fill="#1f7a7a" font-weight="bold">信頼設定 (クラスタごと)</text>
-  <text x="930.0" y="222.6" text-anchor="middle" font-size="13" fill="#555555">アイデンティティ・ドメイン</text>
-  <rect x="730" y="262" width="400" height="296" rx="12" fill="#ffffff" stroke="#37a3a3" stroke-width="2"/>
-  <path d="M730,274 Q730,262 742,262 H1118 Q1130,262 1130,274 V296 H730 Z" fill="#37a3a3"/>
-  <text x="930.0" y="285" text-anchor="middle" font-size="15" fill="#ffffff">コンパートメント: 環境</text>
-  <rect x="755" y="308" width="350" height="56" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="3"/>
-  <text x="930.0" y="342.1" text-anchor="middle" font-size="17" fill="#1f7a7a" font-weight="bold">Vault + マスター暗号化キー</text>
-  <rect x="755" y="418" width="165" height="110" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
-  <text x="837.5" y="457.2" text-anchor="middle" font-size="16" fill="#1f7a7a" font-weight="bold">シークレット</text>
-  <text x="837.5" y="478.8" text-anchor="middle" font-size="13" fill="#555555">アプリ A</text>
-  <text x="837.5" y="500.4" text-anchor="middle" font-size="13" fill="#555555">SA A だけ読める</text>
-  <rect x="940" y="418" width="165" height="110" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
-  <text x="1022.5" y="457.2" text-anchor="middle" font-size="16" fill="#1f7a7a" font-weight="bold">シークレット</text>
-  <text x="1022.5" y="478.8" text-anchor="middle" font-size="13" fill="#555555">アプリ B</text>
-  <text x="1022.5" y="500.4" text-anchor="middle" font-size="13" fill="#555555">SA B だけ読める</text>
-  <path d="M837,366 L837,415" fill="none" stroke="#6b6b6b" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arr-gray)"/>
-  <path d="M1022,366 L1022,415" fill="none" stroke="#6b6b6b" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arr-gray)"/>
-  <text x="930" y="396" text-anchor="middle" font-size="14" fill="#555555">暗号化</text>
-  <path d="M612,203 L727,203" fill="none" stroke="#37a3a3" stroke-width="3" marker-end="url(#arr-teal)"/>
-  <circle cx="668" cy="203" r="13" fill="#37a3a3"/>
-  <text x="668" y="208.5" text-anchor="middle" font-size="15" fill="#ffffff" font-weight="bold">①</text>
-  <path d="M612,220 L668,220 L668,470 L752,470" fill="none" stroke="#37a3a3" stroke-width="3" marker-end="url(#arr-teal)"/>
-  <circle cx="668" cy="345" r="13" fill="#37a3a3"/>
-  <text x="668" y="350.5" text-anchor="middle" font-size="15" fill="#ffffff" font-weight="bold">②</text>
-  <rect x="40" y="606" width="1120" height="90" rx="16" fill="#ededed"/>
-  <text x="600.0" y="643" text-anchor="middle" font-size="17" fill="#333333"><tspan fill="#1f7a7a" font-weight="bold">①</tspan> ESO が SA のトークンを OCI のトークンに交換 → <tspan fill="#1f7a7a" font-weight="bold">②</tspan> SA ごとの権限でシークレットを読む</text>
-  <text x="600.0" y="671" text-anchor="middle" font-size="17" fill="#333333">環境はクラスタ・コンパートメント・信頼設定で分ける。<tspan fill="#1f7a7a" font-weight="bold">アプリ間の分け方 (a〜c) は検討中</tspan> (6.3、7 章)。</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 70 1200 530" width="900" height="397" font-family="'Noto Sans JP','Noto Sans CJK JP','Hiragino Sans','Hiragino Kaku Gothic ProN','Yu Gothic UI','Meiryo',sans-serif">
+  <defs><marker id="arr-teal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#37a3a3"/></marker><marker id="arr-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b6b6b"/></marker><marker id="arr-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#d10000"/></marker></defs>
+  <rect x="0" y="70" width="1200" height="530" fill="#ffffff"/>
+  <rect x="300" y="78" width="28" height="20" rx="4" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="336" y="94" text-anchor="start" font-size="17" fill="#555555">プラットフォームチームが管理</text>
+  <rect x="590" y="78" width="28" height="20" rx="4" fill="#ffffff" stroke="#4d4d4d" stroke-width="2"/>
+  <text x="626" y="94" text-anchor="start" font-size="17" fill="#555555">アプリチームが管理</text>
+  <rect x="795" y="78" width="28" height="20" rx="4" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="831" y="94" text-anchor="start" font-size="17" fill="#555555">自動で作成</text>
+  <path d="M40,116 H640 V560 Q640,582 618,582 H62 Q40,582 40,560 Z" fill="#ffffff" stroke="#c8c8c8" stroke-width="2"/>
+  <rect x="40" y="116" width="600" height="46" fill="#b3b3b3"/>
+  <text x="340.0" y="146.5" text-anchor="middle" font-size="21" fill="#ffffff">OpenShift クラスタ (環境ごと)</text>
+  <rect x="70" y="180" width="540" height="52" rx="8" fill="#37a3a3" stroke="#37a3a3" stroke-width="2"/>
+  <text x="340.0" y="213.0" text-anchor="middle" font-size="20" fill="#ffffff" font-weight="bold">ESO</text>
+  <rect x="70" y="250" width="260" height="312" rx="12" fill="#ffffff" stroke="#4d4d4d" stroke-width="2"/>
+  <path d="M70,262 Q70,250 82,250 H318 Q330,250 330,262 V288 H70 Z" fill="#4d4d4d"/>
+  <text x="200.0" y="275" text-anchor="middle" font-size="17" fill="#ffffff">Namespace: アプリ A</text>
+  <rect x="88" y="300" width="224" height="48" rx="8" fill="#ffffff" stroke="#4d4d4d" stroke-width="2"/>
+  <text x="200.0" y="331.0" text-anchor="middle" font-size="20" fill="#333333" font-weight="bold">ExternalSecret</text>
+  <rect x="88" y="364" width="224" height="48" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="200.0" y="395.0" text-anchor="middle" font-size="20" fill="#1f7a7a" font-weight="bold">SecretStore</text>
+  <rect x="88" y="428" width="224" height="48" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="200.0" y="459.0" text-anchor="middle" font-size="20" fill="#1f7a7a" font-weight="bold">ServiceAccount A</text>
+  <rect x="88" y="492" width="224" height="48" rx="8" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="200.0" y="523.0" text-anchor="middle" font-size="20" fill="#555555">Secret</text>
+  <path d="M200,349 L200,361" fill="none" stroke="#6b6b6b" stroke-width="2" marker-end="url(#arr-gray)"/>
+  <path d="M200,413 L200,425" fill="none" stroke="#6b6b6b" stroke-width="2" marker-end="url(#arr-gray)"/>
+  <rect x="350" y="250" width="260" height="312" rx="12" fill="#ffffff" stroke="#4d4d4d" stroke-width="2"/>
+  <path d="M350,262 Q350,250 362,250 H598 Q610,250 610,262 V288 H350 Z" fill="#4d4d4d"/>
+  <text x="480.0" y="275" text-anchor="middle" font-size="17" fill="#ffffff">Namespace: アプリ B</text>
+  <rect x="368" y="300" width="224" height="48" rx="8" fill="#ffffff" stroke="#4d4d4d" stroke-width="2"/>
+  <text x="480.0" y="331.0" text-anchor="middle" font-size="20" fill="#333333" font-weight="bold">ExternalSecret</text>
+  <rect x="368" y="364" width="224" height="48" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="480.0" y="395.0" text-anchor="middle" font-size="20" fill="#1f7a7a" font-weight="bold">SecretStore</text>
+  <rect x="368" y="428" width="224" height="48" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="480.0" y="459.0" text-anchor="middle" font-size="20" fill="#1f7a7a" font-weight="bold">ServiceAccount B</text>
+  <rect x="368" y="492" width="224" height="48" rx="8" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="480.0" y="523.0" text-anchor="middle" font-size="20" fill="#555555">Secret</text>
+  <path d="M480,349 L480,361" fill="none" stroke="#6b6b6b" stroke-width="2" marker-end="url(#arr-gray)"/>
+  <path d="M480,413 L480,425" fill="none" stroke="#6b6b6b" stroke-width="2" marker-end="url(#arr-gray)"/>
+  <path d="M700,116 H1160 V560 Q1160,582 1138,582 H722 Q700,582 700,560 Z" fill="#f2f2f2"/>
+  <rect x="700" y="116" width="460" height="46" fill="#b3b3b3"/>
+  <text x="930.0" y="146.5" text-anchor="middle" font-size="21" fill="#ffffff">OCI テナンシ</text>
+  <rect x="728" y="180" width="404" height="62" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="930.0" y="205.0" text-anchor="middle" font-size="20" fill="#1f7a7a" font-weight="bold">信頼設定 (クラスタごと)</text>
+  <text x="930.0" y="231.0" text-anchor="middle" font-size="17" fill="#555555">アイデンティティ・ドメイン</text>
+  <rect x="728" y="262" width="404" height="300" rx="12" fill="#ffffff" stroke="#37a3a3" stroke-width="2"/>
+  <path d="M728,274 Q728,262 740,262 H1120 Q1132,262 1132,274 V300 H728 Z" fill="#37a3a3"/>
+  <text x="930.0" y="287" text-anchor="middle" font-size="17" fill="#ffffff">コンパートメント: 環境</text>
+  <rect x="752" y="312" width="356" height="54" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="3"/>
+  <text x="930.0" y="346.0" text-anchor="middle" font-size="20" fill="#1f7a7a" font-weight="bold">Vault + マスター暗号化キー</text>
+  <rect x="752" y="420" width="168" height="118" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="836.0" y="460.0" text-anchor="middle" font-size="20" fill="#1f7a7a" font-weight="bold">シークレット</text>
+  <text x="836.0" y="486.0" text-anchor="middle" font-size="17" fill="#555555">アプリ A 用</text>
+  <text x="836.0" y="512.0" text-anchor="middle" font-size="17" fill="#555555">SA A だけ読める</text>
+  <rect x="940" y="420" width="168" height="118" rx="8" fill="#e7f4f4" stroke="#37a3a3" stroke-width="2"/>
+  <text x="1024.0" y="460.0" text-anchor="middle" font-size="20" fill="#1f7a7a" font-weight="bold">シークレット</text>
+  <text x="1024.0" y="486.0" text-anchor="middle" font-size="17" fill="#555555">アプリ B 用</text>
+  <text x="1024.0" y="512.0" text-anchor="middle" font-size="17" fill="#555555">SA B だけ読める</text>
+  <path d="M836,368 L836,417" fill="none" stroke="#6b6b6b" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arr-gray)"/>
+  <path d="M1024,368 L1024,417" fill="none" stroke="#6b6b6b" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arr-gray)"/>
+  <text x="930" y="398" text-anchor="middle" font-size="17" fill="#555555">暗号化</text>
+  <path d="M612,206 L725,206" fill="none" stroke="#37a3a3" stroke-width="3" marker-end="url(#arr-teal)"/>
+  <circle cx="668" cy="206" r="14" fill="#37a3a3"/>
+  <text x="668" y="212" text-anchor="middle" font-size="17" fill="#ffffff" font-weight="bold">①</text>
+  <path d="M612,222 L668,222 L668,478 L749,478" fill="none" stroke="#37a3a3" stroke-width="3" marker-end="url(#arr-teal)"/>
+  <circle cx="668" cy="350" r="14" fill="#37a3a3"/>
+  <text x="668" y="356" text-anchor="middle" font-size="17" fill="#ffffff" font-weight="bold">②</text>
 </svg>
