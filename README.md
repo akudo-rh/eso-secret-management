@@ -1,7 +1,5 @@
-# OpenShift における Secret 管理と External Secrets Operator (ESO) のご提案
+# OpenShift における Secret 管理と External Secrets Operator (ESO) について
 
-> 検証結果は ROSA (AWS Secrets Manager) / OpenShift on OCI (OCI Vault) の実機検証に基づく。
-> 図は Mermaid 形式 (GitHub 上で図として表示される)。
 
 ## 目次
 - [1. Secret とは、なぜ管理が必要か](#1-secret-とはなぜ管理が必要か)
