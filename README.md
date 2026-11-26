@@ -47,7 +47,7 @@ flowchart LR
 
 | 方法 | 概要 | 値の保管先 |
 |---|---|---|
-| ① 標準 Secret (手動作成) | `oc create secret` で直接登録。簡単だが保管と更新は人手 | クラスタ内 |
+| ① 標準 Secret (手動作成) | `oc create secret` で直接登録。簡単だが保管と更新は人手。**base64でエンコードされているだけ（非暗号化）**。 | クラスタ内 |
 | ② **External Secrets Operator (ESO)** | 外部の保管庫の値を、Operator が定期的に Kubernetes の Secret へ同期する | **外部の保管庫** |
 
 ```mermaid
