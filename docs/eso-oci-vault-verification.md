@@ -76,8 +76,8 @@ OCI コンソールは、画面右上のプロファイル (人型アイコン) 
 | `<VAULT_OCID>` | SecretStore の `vault` | OCI コンソール → アイデンティティとセキュリティ → ボールト → 対象 Vault の詳細の OCID の「コピー」 |
 | `<COMPARTMENT_OCID>` | シークレット作成 (§4.2) | OCI コンソール → アイデンティティとセキュリティ → コンパートメント → 対象の詳細の OCID |
 | `<KEY_OCID>` | シークレット作成 (§4.2) | 対象 Vault の詳細 →「マスター暗号化キー」タブ → キーの OCID |
-| `<TARGET_NAMESPACE>` (本書は `eso-test`)、`<SECRET_STORE>` (本書は `oci-vault`)、`<TARGET_SECRET>` (本書は `demo-secret`)、`<SECRET_KEY>` (本書は `password`)、`<OCI_CREDENTIALS_SECRET>` (本書は `oci-credentials`) | YAML、コマンド | 自分で決める ([yaml/README.md](../yaml/README.md)) |
-| `<REMOTE_SECRET_NAME>` (本書は `eso-demo-password`) | ExternalSecret の `remoteRef.key` | 自分で決める。作成後は Vault の「シークレット」タブ / `oci vault secret list --compartment-id <COMPARTMENT_OCID>` |
+| `<TARGET_NAMESPACE>` (本書は `eso-test`)、`<SECRET_STORE>` (本書は `oci-vault`)、`<TARGET_SECRET>` (本書は `demo-secret`)、`<SECRET_KEY>` (本書は `password`)、`<OCI_CREDENTIALS_SECRET>` (本書は `oci-credentials`) | YAML、コマンド | 任意の値を設定する ([yaml/README.md](../yaml/README.md)) |
+| `<REMOTE_SECRET_NAME>` (本書は `eso-demo-password`) | ExternalSecret の `remoteRef.key` | 任意の値を設定する。作成後は Vault の「シークレット」タブ / `oci vault secret list --compartment-id <COMPARTMENT_OCID>` |
 | `<SECRET_OCID>` | 値の更新 (§4.6) | Vault の「シークレット」タブから対象を開き、詳細の OCID / 上記 `oci vault secret list` の `id` |
 
 ### 2.3 クラスタへのログイン
