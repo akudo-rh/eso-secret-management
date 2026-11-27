@@ -358,19 +358,6 @@ oc get secret <TARGET_SECRET> -n <TARGET_NAMESPACE> -o jsonpath='{.data.password
 (コンソールの場合: Secrets Manager → シークレット詳細 →「シークレットの値を取得する」→「編集」で値を変更する。)
 期待する結果: `refreshInterval` (1m) 後に `P@ssw0rd-from-aws-v2` へ更新される。
 
-### 4.7 (任意) 権限を外した場合の挙動
-ESO と AWS 側権限の関係を確認する。
-```bash
-aws iam detach-role-policy --role-name rosa-eso-demo \
-  --policy-arn arn:aws:iam::<ACCOUNT_ID>:policy/rosa-eso-demo-read
-# 次の refresh 後
-oc get externalsecret <TARGET_SECRET> -n <TARGET_NAMESPACE>      # STATUS が失敗側 (SecretSyncedError) になる
-oc get secret <TARGET_SECRET> -n <TARGET_NAMESPACE>              # 同期済みの Secret は残る
-# 確認後に再 attach
-aws iam attach-role-policy --role-name rosa-eso-demo \
-  --policy-arn arn:aws:iam::<ACCOUNT_ID>:policy/rosa-eso-demo-read
-```
-
 ## 5. トラブルシュート
 
 | 症状 | 確認 |
@@ -386,19 +373,7 @@ aws iam attach-role-policy --role-name rosa-eso-demo \
 | 全般のタイムアウト | クラスタから AWS API への egress 制限 (§2.4) |
 | ESO のログ | `oc logs -n external-secrets deploy/external-secrets` (名前空間は `oc get po -A \| grep external-secrets` で確認) |
 
-## 6. 本番利用に向けた課題
-
-| 観点 | 本書の構成 | 本番での論点 |
-|---|---|---|
-| 認証 | STS / OIDC (静的キーなし) | ROSA では標準的で推奨。Role は用途ごとに分割し、`sub` で ServiceAccount を限定する |
-| スコープ | Namespace 単位の `SecretStore` | 共通利用は `ClusterSecretStore`。作成・参照できる人を絞る |
-| 権限 | 1 シークレットのみ参照 | パスのプレフィックス単位で最小権限を設計する |
-| 通信制御 | ESO の外向き 443 を全宛先に許可 (検証用) | VPC エンドポイント経由にする、または宛先を限定する |
-| 監査 | CloudTrail には ESO 用 Role 名義で記録される | Pod 単位の追跡が必要なら別方式との比較が論点 |
-| 可用性 | 同期済み Secret は残る (4.7) | AWS 側障害時の挙動を運用手順に反映 |
-| サポート | AWS Secrets Manager は ESO の対象プロバイダー | Red Hat のサポート範囲は ESO のバージョン別に確認 |
-
-## 7. 後片付け
+## 6. 後片付け
 
 ```bash
 oc delete project <TARGET_NAMESPACE>
