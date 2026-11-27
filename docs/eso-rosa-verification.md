@@ -74,10 +74,10 @@ Kubernetes Secret (key: password)
 | `<REGION>` (例: `ap-northeast-1`) | SecretStore の `region`、AWS コマンド、§2.4 の通信確認 | `rosa describe cluster -c <CLUSTER_NAME>` の `Region` / AWS コンソール右上のリージョン表示 |
 | `<ACCOUNT_ID>` (12 桁) | IAM Role / Policy の ARN | `aws sts get-caller-identity --query Account --output text` / AWS コンソール右上のアカウントメニュー |
 | `<OIDC_HOST_PATH>` (`https://` を除いた OIDC URL) | IAM Role の信頼ポリシー | `rosa describe cluster -c <CLUSTER_NAME>` の `OIDC Endpoint URL` から `https://` を除く。IAM コンソール →「ID プロバイダ」に同じ値のプロバイダがあること (`aws iam list-open-id-connect-providers`) |
-| `<REMOTE_SECRET_NAME>` (例: `rosa-demo/password`) | ExternalSecret の `remoteRef.key` | 自分で決める。作成後は AWS コンソール → Secrets Manager の一覧 / `aws secretsmanager list-secrets --region <REGION>` |
+| `<REMOTE_SECRET_NAME>` (例: `rosa-demo/password`) | ExternalSecret の `remoteRef.key` | 任意の値を設定する。作成後は AWS コンソール → Secrets Manager の一覧 / `aws secretsmanager list-secrets --region <REGION>` |
 | `<SECRET_ARN>` | 権限ポリシーの `Resource` | `aws secretsmanager describe-secret --region <REGION> --secret-id <REMOTE_SECRET_NAME> --query ARN --output text` / コンソールのシークレット詳細画面 (末尾にランダムな 6 文字が付く) |
-| `<TARGET_NAMESPACE>` (本書は `eso-test`)、`<SERVICE_ACCOUNT>` (本書は `eso-aws-sa`) | 信頼ポリシーの `sub`、ServiceAccount、SecretStore | 自分で決める。**信頼ポリシーの `sub` (`system:serviceaccount:<TARGET_NAMESPACE>:<SERVICE_ACCOUNT>`) と、クラスタ上の実際の名前が 1 文字でも違うと認証に失敗する** (`oc get sa -n <TARGET_NAMESPACE>` で確認) |
-| `<SECRET_STORE>` (本書は `aws-sm`)、`<TARGET_SECRET>` (本書は `demo-secret-aws`)、`<SECRET_KEY>` (本書は `password`) | SecretStore、ExternalSecret | 自分で決める ([yaml/README.md](../yaml/README.md)) |
+| `<TARGET_NAMESPACE>` (本書は `eso-test`)、`<SERVICE_ACCOUNT>` (本書は `eso-aws-sa`) | 信頼ポリシーの `sub`、ServiceAccount、SecretStore | 任意の値を設定する。**信頼ポリシーの `sub` (`system:serviceaccount:<TARGET_NAMESPACE>:<SERVICE_ACCOUNT>`) と、クラスタ上の実際の名前が 1 文字でも違うと認証に失敗する** (`oc get sa -n <TARGET_NAMESPACE>` で確認) |
+| `<SECRET_STORE>` (本書は `aws-sm`)、`<TARGET_SECRET>` (本書は `demo-secret-aws`)、`<SECRET_KEY>` (本書は `password`) | SecretStore、ExternalSecret | 任意の値を設定する ([yaml/README.md](../yaml/README.md)) |
 | `<ROLE_ARN>` | ServiceAccount の注釈 | Role を管理者に作ってもらった場合は返ってきた ARN / `aws iam get-role --role-name <ROLE_NAME> --query Role.Arn --output text` / IAM コンソール →「ロール」の詳細 |
 
 ### 2.3 ROSA へのログイン
