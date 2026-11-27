@@ -24,6 +24,7 @@
 - [2. OpenShift での Secret 管理の方法](#2-openshift-での-secret-管理の方法)
 - [3. ESO の仕組み](#3-eso-の仕組み)
 - [4. 方式の比較 (メリット・デメリット)](#4-方式の比較-メリットデメリット)
+  - [4.1 プラットフォームチームの作業はどう変わるか](#41-プラットフォームチームの作業はどう変わるか)
 - [5. 導入手順 (実機検証済みの流れ)](#5-導入手順-実機検証済みの流れ)
   - [5.1 ROSA 版 (保管庫: AWS Secrets Manager)](#51-rosa-版-保管庫-aws-secrets-manager)
   - [5.2 OCI 版 (保管庫: OCI Vault / OpenShift on OCI)](#52-oci-版-保管庫-oci-vault--openshift-on-oci)
@@ -74,8 +75,8 @@ Secret はアプリケーションの「設定」ではなく「鍵」である�
 
 | 対象 | 嬉しい点 |
 |---|---|
-| アプリチーム | 値の実物を知らなくてよい。値の受け渡し待ちや、環境ごとの差し替え作業がなくなり、「自分が漏らしたのではないか」という責任からも解放される |
-| プラットフォームチーム | 最初に仕組み (型) を作る手間はかかるが、その後は値の配布や変更の依頼に毎回手作業で応じなくてよくなる |
+| アプリチーム | Secret を自分で作成・配布しなくてよい。値をアプリの設定ファイルや Git に書かずに済み、環境ごとの差し替え作業もなくなる |
+| プラットフォームチーム | 最初の準備と、アプリ追加時の定型作業は増える。その代わり、値の配布・変更・監査対応・クラスタ再構築のたびに発生していた手作業が減る (4.1) |
 | 管理・セキュリティ担当 | 誰がどの値にアクセスできるかを保管庫側で一覧・統制できる |
 | 運用・障害対応 | 緊急時に変更する場所が 1 か所で、影響範囲が分かる |
 
@@ -117,15 +118,27 @@ OpenShift 上の全リソースの一覧は 5.4。
 | 観点 | ① 標準 Secret | ② ESO |
 |---|---|---|
 | 値の保管先 | クラスタ内 | **外部の保管庫** |
-| 更新・ローテーション | 手動 | **自動 (定期同期)** |
+| 値の変更 (ローテーション) | 置き場所ごとに手作業 | **保管庫の 1 か所を変更すれば自動で反映** |
 | Git に値を置かない | ○ (ただし手作業) | **○** |
 | 権限・監査の一元管理 | × | **○ (保管庫側)** |
 | 保管庫停止時 | 影響なし | 同期済みの Secret で稼働を継続<br>(停止中は更新・新規作成が反映されない) |
 | クラスタ (etcd) に値が残る | 残る | 残る |
 | 導入の手間 | 小 | 中 (Operator の導入と保管庫の準備) |
 
-> 注: etcd に値が残る点は、etcd の暗号化と RBAC で担保する。
-> 注: 「自動 (定期同期)」について詳細は 6.4 を参照。
+> 注: etcd に値が残る点は、etcd の暗号化と RBAC で担保する。自動で反映されるのは Secret までで、アプリへの反映は参照方法による (6.4)。
+
+### 4.1 プラットフォームチームの作業はどう変わるか
+
+| 場面 | ① 標準 Secret | ② ESO |
+|---|---|---|
+| 最初の準備 | ほぼなし | Operator の導入、保管庫と権限の準備 (環境ごとに 1 回) |
+| アプリを追加するとき | なし | ServiceAccount と SecretStore を用意 (定型作業で、テンプレート化できる) |
+| 値を追加するとき | 環境・クラスタ・Namespace ごとに `oc create secret` | 環境ごとに保管庫へ登録。クラスタ・Namespace への配布は自動 |
+| 値を変更するとき (証明書の更新、漏えい対応など) | 置き場所をすべて特定し、1 つずつ差し替え | 保管庫の 1 か所を更新。残りは自動で反映 |
+| 監査・問い合わせ (誰がどの値を使えるか) | 各クラスタの権限や手元の記録から調べる | 保管庫の権限設定と監査ログで説明できる |
+| クラスタの再構築・移行 | 値の所在を調べて Secret を作り直す | Git の定義を適用すれば、保管庫から自動で復元 (OCI の API キー方式では、その Secret 1 つだけ作り直す) |
+
+作業が増えるのは最初の準備とアプリ追加時の定型作業で、値の追加・変更・監査対応・再構築のたびに発生していた手作業が減る。値やアプリ、環境が増えるほど、この差は大きくなる。
 
 ## 5. 導入手順 (実機検証済みの流れ)
 
@@ -133,11 +146,7 @@ OpenShift 上の全リソースの一覧は 5.4。
 
 ![導入の流れ: 6 つの手順と、共通・環境依存の区分](docs/images/install-steps.svg)
 
-| 手順 | 共通 / 環境依存 |
-|---|---|
-| 1〜3 Operator と ESO 本体 | 共通 (ROSA / OCI とも同じ) |
-| 4 保管庫の準備と認証・通信の設定 | **環境依存** (下表)。ROSA は ESO の外向き通信を許可する NetworkPolicy の追加が必要 |
-| 5〜6 SecretStore / ExternalSecret | 接続先の記述だけ環境依存 |
+手順 4 は環境によって異なる (5.1・5.2)。ROSA では、ESO の外向き通信を許可する NetworkPolicy の追加が必要。
 
 ### 5.1 ROSA 版 (保管庫: AWS Secrets Manager)
 ![ROSA 版: STS で認証し AWS Secrets Manager から取得する](docs/images/rosa-auth.svg)
@@ -157,7 +166,7 @@ OpenShift 上の全リソースの一覧は 5.4。
 
 | 項目 | 内容 |
 |---|---|
-| 認証 | User Principal (API キー)。OCI のユーザー設定で API キーを作成して秘密鍵をダウンロードし、OpenShift に Secret として作成して SecretStore から参照する (検証用) |
+| 認証 | User Principal (API キー)。秘密鍵を OpenShift の Secret として持ち、SecretStore から参照する (検証用) |
 | OCI 側の準備 | Vault と Master Encryption Key、シークレット、ユーザー/グループ/IAM ポリシー |
 | OpenShift 側の準備 | API キーを入れる Secret の作成。ROSA で必要だった外向き通信の NetworkPolicy は、OCI の検証では追加しなくても接続できた (ESO が外に出られない場合は ROSA と同じ対処をする) |
 | 注意点 | API キーの保管とローテーションが必要 (管理案は 5.2.2)。Workload Identity による認証も確認中 (5.2.1) |
@@ -217,15 +226,13 @@ OCI の認証方式についての、現時点での考え方は次のとおり�
 
 ### 6.1 作業ごとの担当
 
-![作業ごとの担当 (R1〜R8)](docs/images/roles.svg)
-
 | 項番 | 作業 | プラットフォーム | アプリ |
 |---|---|---|---|
 | R1 | 必要な Secret の洗い出し (名前・用途・更新頻度) | 確認 | **実施** |
 | R2 | 保管庫 (Vault・暗号化キー) の作成、IAM (信頼設定・ポリシー) の設定 (コンソール操作) | **実施** | |
 | R3 | Secret の値の登録・更新 (ローテーション含む) | **実施** | 依頼 |
 | R4 | ESO / Operator の導入・更新・監視 | **実施** | |
-| R5 | アプリごとの ServiceAccount と SecretStore の作成 | **実施** | |
+| R5 | アプリごとの ServiceAccount と SecretStore (または ClusterSecretStore) の作成 | **実施** | |
 | R6 | ExternalSecret の作成 (Git 管理) | | **実施** |
 | R7 | manifest のデプロイ自動化 (CI/CD) | **実施** | 利用 |
 | R8 | アプリでの Secret の利用 | | **実施** |
@@ -268,11 +275,11 @@ Allow <誰が> to <何をする> <何に> in compartment <どこで> where <条�
 | 何をする | `read` (読み取り) / `use` (利用) / `manage` (作成・変更・削除) |
 | 何に | `secret-bundles` (シークレットの値) / `secret-family` (シークレット一式) / `vaults` / `keys` |
 
-本設計のポリシー (本番の例。他の環境も同じ形):
+本設計のポリシー (本番の例。他の環境も同じ形。`<ISSUER>` はクラスタのトークン発行者):
 
 | 対象 | ポリシー |
 |---|---|
-| ESO (アプリの ServiceAccount) | `Allow any-user to read secret-bundles in compartment prod where all { request.principal.type = 'identityfederateddomainapp', request.principal.name = 'system:serviceaccount:<Namespace>:<ServiceAccount>', request.principal.ext_iss = '<本番クラスタの発行者>' }` と、同じ条件で `read vaults` (ESO が SecretStore の接続確認で Vault の情報を読むため)。アプリ間で分ける場合は下表の条件を追加する |
+| ESO (アプリの ServiceAccount) | `Allow any-user to read secret-bundles in compartment prod where all { request.principal.type = 'identityfederateddomainapp', request.principal.name = 'system:serviceaccount:<TARGET_NAMESPACE>:<SERVICE_ACCOUNT>', request.principal.ext_iss = '<ISSUER>' }` と、同じ条件で `read vaults` (ESO が SecretStore の接続確認で Vault の情報を読むため)。アプリ間で分ける場合は下表の条件を追加する |
 | プラットフォームチーム | `Allow group platform-admins to manage vaults / keys / secret-family in compartment prod` (3 行) |
 
 **アプリ間の分け方 (候補)**
@@ -311,8 +318,6 @@ Allow <誰が> to <何をする> <何に> in compartment <どこで> where <条�
 | 1 | 保管庫に新しいバージョンを登録 | プラットフォーム |
 | 2 | `refreshInterval` 後に Secret へ自動反映 (3 章)。これだけではアプリの動作は変わらない場合がある (次の行) | (自動) |
 | 3 | アプリへの反映: 環境変数で参照している場合は Pod の再起動が必要。ボリュームで参照している場合は自動で反映される | アプリ |
-
-![運用フロー: 新しい Secret を追加する](docs/images/operation-flow.svg)
 
 ## 付録: 参照ドキュメント
 - [eso-rosa-verification.md](docs/eso-rosa-verification.md) — ROSA 版の手順

@@ -15,7 +15,7 @@ ROSA クラスタに External Secrets Operator (ESO) を導入し、Secret が�
 | `cluster-admin` が使えるか | ROSA 管理者 | Operator 導入に必須。不可なら導入のみ依頼 |
 | クライアントから API サーバーへ到達可能か (Private か) | ネットワーク担当 | Private の場合は踏み台 / VPN 経由 |
 | クラスタから AWS API (STS / Secrets Manager) への egress | ネットワーク担当 | 不可の場合は許可依頼 (§2.4) |
-| 利用可能な AWS 権限 (IAM Role / Policy、Secrets Manager の作成) | AWS 管理者 | 不可の場合は [request-to-admin-rosa.md](request-to-admin-rosa.md) の代替案で依頼 |
+| 利用可能な AWS 権限 (IAM Role / Policy、Secrets Manager の作成) | AWS 管理者 | §4.2・4.3 の作成に必要 |
 
 ## 1. 検証の概要
 
@@ -259,7 +259,6 @@ aws secretsmanager describe-secret --region <REGION> \
 
 ### 4.3 IAM Role の作成 (ROSA の OIDC を信頼)
 ESO が使う ServiceAccount (`<TARGET_NAMESPACE>/<SERVICE_ACCOUNT>`) だけがこの Role を引き受けられるようにする。アクセスキーは作らない。
-IAM の作成権限が無い場合は、管理者に作成を依頼する ([request-to-admin-rosa.md](request-to-admin-rosa.md))。依頼時は下の 2 つの JSON と、返してほしい値 (`<ROLE_ARN>`) を伝える。
 
 **① 権限ポリシー** (`rosa-eso-demo-read`): 対象シークレット 1 件の参照のみ ([yaml/aws-iam/read-secret-policy.json](../yaml/aws-iam/read-secret-policy.json))
 ```json
